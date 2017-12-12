@@ -23,4 +23,5 @@ cargo run
 ### Games implemented 
 
 [Nim](./example-games/nim)
+
 [Agricola - Still in testing](./example-games/agricola)
