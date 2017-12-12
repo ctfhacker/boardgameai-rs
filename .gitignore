@@ -1,0 +1,7 @@
+target/*
+**/*.rs.bk
+Cargo.lock
+tags
+example-games/*/target
+exampl-gamess/*/.gdb_history
+src/core.rs
