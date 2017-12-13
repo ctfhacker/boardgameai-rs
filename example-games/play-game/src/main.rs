@@ -188,9 +188,17 @@ fn main() {
     */
 
     while state.clone().get_actions().len() > 0 {
-        let best_action = UCT(arena, state.clone(), 5000);
+        let mut best_action;
+        if state.current_player == 0 {
+            // First player is "better" with more iterations
+            best_action = UCT(arena, state.clone(), 500);
+        } else {
+            // "dumb" players
+            best_action = UCT(arena, state.clone(), 50);
+        }
+
         // println!("{}", arena.simple_display());
-        // println!("Best action {:?}", best_action);
+        println!("Best action {:?}", AgricolaAction::from_u32(best_action));
         state.do_action(best_action);
     }
 
