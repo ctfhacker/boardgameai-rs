@@ -1,10 +1,14 @@
+#![feature(exclusive_range_pattern)]
 extern crate boardgameai_rs;
+extern crate rand;
+
 use boardgameai_rs::*;
 use boardgameai_rs::state::State;
 use boardgameai_rs::action::Action;
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Display;
+use rand::Rng;
 
 #[derive(Debug, Clone)]
 struct Player {
@@ -21,7 +25,8 @@ struct Player {
     boar: usize,
     actions: usize,
     total_actions: usize,
-    actions_taken: Vec<String>
+    actions_taken: Vec<String>,
+    player_mat: PlayerMat
 }
 
 impl Player {
@@ -40,7 +45,8 @@ impl Player {
             cattle: 0,
             actions: 2,
             total_actions: 2,
-            actions_taken: Vec::new()
+            actions_taken: Vec::new(),
+            player_mat: PlayerMat::new()
         }
     }
 
@@ -95,11 +101,29 @@ impl Player {
         result
     }
 
+    /// Randomly plow a field if none exists. If a field already exists, plow a random field
+    /// connected to an existing field
+    fn plow(&mut self) {
+        if self.fields == 0 {
+            loop {
+                let num = rand::thread_rng().gen_range(0, 15);
+                if self.player_mat.tiles[num].is_empty() {
+                    self.player_mat.tiles[num].plow();
+                    break;
+                }
+            }
+        } else {
+            self.player_mat.plow_random_field();
+        }
+    }
+
 }
 
 impl Display for Player {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {}]", self.food, self.grain, self.wood, self.clay, self.reed, self.stone, self.actions, self.total_actions, self.fields)
+        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {}]\n{}", 
+                    self.food, self.grain, self.wood, self.clay, self.reed, 
+                    self.stone, self.actions, self.total_actions, self.fields, self.player_mat)
     }
 }
 
@@ -417,6 +441,7 @@ impl State for AgricolaState {
                     // println!("In Plow.. doing nothing");
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
                     action_taken = format!("Plow").to_string();
+                    player.plow();
                     player.fields += 1;
                 },
                 Some(AgricolaAction::BuildStable_BakeBread) => {
@@ -494,7 +519,7 @@ impl AgricolaState {
             starting_player_token: None,
             board: Board::new(),
             rounds: 1,
-            total_rounds: 15,
+            total_rounds: 6,
             actions_taken: Vec::new()
         }
     }
@@ -536,18 +561,8 @@ impl AgricolaState {
 
     pub fn print_ending(&self) {
         for (i, player) in self.players.iter().enumerate() {
-            println!("Player {}: {} -- {}", i, player.score(), player);
-            /*
-            for action in player.actions_taken.iter() {
-                println!("{}", action);
-            }
-            */
+            println!("Player {}: {}\n{}", i, player.score(), player);
         }
-        /*
-        for action in self.actions_taken.iter() {
-            println!("{}", action);
-        }
-        */
 
         let mut scores = Vec::new();
         for player in &self.players {
@@ -565,4 +580,349 @@ impl Display for AgricolaState {
         write!(f, "{}", self.board);
         write!(f, "Next Player: {}\n", self.current_player + 1)
     }
+}
+
+#[derive(Debug, Clone)]
+enum HouseType {
+    Wood,
+    Clay,
+    Stone
+}
+
+impl Display for HouseType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &HouseType::Wood  => write!(f, "Wood "),
+            &HouseType::Clay  => write!(f, "Clay "),
+            &HouseType::Stone => write!(f, "Stone"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Animal {
+    Sheep,
+    Boar,
+    Cattle
+}
+
+impl Display for Animal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Animal::Sheep  => write!(f, "Sheep "),
+            &Animal::Boar   => write!(f, "Boar  "),
+            &Animal::Cattle => write!(f, "Cattle"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PlayerMat {
+    tiles: Vec<FarmTile>
+}
+
+impl PlayerMat {
+    pub fn new() -> PlayerMat {
+        let mut player_mat = Vec::new();
+        for i in 0..15 {
+            let mut new_tile = FarmTile::new();
+            match i {
+                5|10 => {
+                    new_tile.house = Some(HouseType::Wood);
+                },
+                _ => new_tile.house = None
+            }
+
+            match i {
+                4|9|14 => {},
+                _ => new_tile.surrounding_tiles.push(i+1)
+            }
+            match i {
+                0|5|10 => {},
+                _ => new_tile.surrounding_tiles.push(i-1)
+            }
+            match i {
+                0..5 => {},
+                _ => new_tile.surrounding_tiles.push(i-5)
+            }
+            match i {
+                10..15 => {},
+                _ => new_tile.surrounding_tiles.push(i+5)
+            }
+
+            player_mat.push(new_tile);
+        }
+        PlayerMat { tiles: player_mat }
+    }
+
+    /// Given a number, place a fence at that location for both tiles touching that fence location
+    pub fn place_fence(&mut self, x: usize) {
+        let tile_index = x / 4;
+        let position = x % 4;
+        match position {
+            0 => {
+                {
+                    let curr_tile = &mut self.tiles[tile_index];
+                    curr_tile.north_fence = true;
+                }
+                match tile_index {
+                    0..5 => {}, // Prevent underflow
+                    _ => {
+                        let next_tile = &mut self.tiles[tile_index-5];
+                        next_tile.south_fence = true;
+                    }
+                }
+            },
+            1 => {
+                {
+                    let curr_tile = &mut self.tiles[tile_index];
+                    curr_tile.west_fence  = true;
+                }
+                match tile_index {
+                    0|5|10 => {}, // Prevent underflow
+                    _ => {
+                        let next_tile = &mut self.tiles[tile_index-1];
+                        next_tile.east_fence = true;
+                    }
+                }
+            },
+            2 => {
+                {
+                    let curr_tile = &mut self.tiles[tile_index];
+                    curr_tile.south_fence = true;
+                }
+                match tile_index {
+                    10..15 => {}, // Prevent out of bounds access
+                    _ => {
+                        let next_tile = &mut self.tiles[tile_index+5];
+                        next_tile.north_fence = true;
+                    }
+                }
+            },
+            3 => {
+                {
+                    let curr_tile = &mut self.tiles[tile_index];
+                    curr_tile.east_fence  = true;
+                }
+                match tile_index {
+                    4|9|14 => {}, // Prevent out of bounds access
+                    _ => {
+                        let next_tile = &mut self.tiles[tile_index+1];
+                        next_tile.west_fence = true;
+                    }
+                }
+            },
+            _ => panic!("Should never reach here!")
+        };
+
+    }
+
+    fn plow_random_field(&mut self) {
+        // Get vector of indexes of current fields in the player mat
+        let curr_fields: Vec<usize> = self.tiles
+                                          .iter()
+                                          .enumerate()
+                                          .filter(|&(i, t)| !(t.field.is_none()))
+                                          .map(|(i, t)| i)
+                                          .collect();
+
+        // Filter surrounding tiles if they are empty
+        let possible_fields: Vec<usize> = curr_fields.iter()
+                                                     .flat_map(|&i| self.tiles[i].surrounding_tiles.clone())
+                                                     .filter(|&i| self.tiles[i].is_empty())
+                                                     .collect();
+
+        let random_field = rand::thread_rng().choose(&possible_fields).unwrap();
+        self.tiles[*random_field].plow();
+    }
+}
+
+impl Display for PlayerMat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for row in 0..3 {
+            // Top line
+            let mut line = String::from("+");
+            for i in (row*5)..(row*5)+5 {
+                let curr_tile = &self.tiles[i];
+                match curr_tile.north_fence {
+                    true  => line = format!("{} --------- +", line),
+                    false => line = format!("{}           +", line),
+                };
+            }
+            write!(f, "{}\n", line);
+
+            // Row - Index
+            match self.tiles[row*5].west_fence {
+                true  => line = String::from("|"),
+                false => line = String::from(" "),
+            };
+            for i in (row*5)..(row*5)+5 {
+                let curr_tile = &self.tiles[i];
+                line = format!("{}{number:>width$}        ", line, number=i, width=2);
+                match curr_tile.east_fence {
+                    true  => line = format!("{}| ", line),
+                    false => line = format!("{}  ", line),
+                }
+            }
+
+            write!(f, "{}\n", line);
+            
+
+            // Row - Type of Tile (House or Field)
+            match self.tiles[row*5].west_fence {
+                true  => line = String::from("| "),
+                false => line = String::from("  "),
+            };
+            for i in (row*5)..(row*5)+5 {
+                let curr_tile = &self.tiles[i];
+                match (&curr_tile.house, &curr_tile.field) {
+                    (&Some(ref house), &None) => line = format!("{} {}    ", line, house),
+                    (&None, &Some(ref field)) => line = format!("{} Field    ", line),
+                    (&None, &None)            => line = format!("{}          ", line),
+                    _ => panic!("Tile has multiple types!")
+                };
+                match curr_tile.east_fence {
+                    true  => line = format!("{}| ", line),
+                    false => line = format!("{}  ", line),
+                }
+            }
+
+            write!(f, "{}\n", line);
+
+            // Row - Count of resources on tile
+            match self.tiles[row*5].west_fence {
+                true  => line = String::from("| "),
+                false => line = String::from("  "),
+            };
+            for i in (row*5)..(row*5)+5 {
+                let curr_tile = &self.tiles[i];
+                match (&curr_tile.animal_type, &curr_tile.field) {
+                    (&Some(ref animal), &None) => line = format!("{} {}: {}  ", line, animal, curr_tile.animal_count),
+                    (&None, &Some(ref field))  => {
+                        match field.count() {
+                            0 => line = format!("{}          ", line),
+                            _ => line = format!("{} {}: {} ", line, field.crop(), field.count()),
+                        }
+                    }
+                    (&None, &None)             => line = format!("{}          ", line),
+                    _ => panic!("Tile has multiple types!")
+                };
+                match curr_tile.east_fence {
+                    true  => line = format!("{}| ", line),
+                    false => line = format!("{}  ", line),
+                }
+            }
+
+            write!(f, "{}\n", line);
+
+            // Row - Count of resources on tile
+            match self.tiles[row*5].west_fence {
+                true  => line = String::from("| "),
+                false => line = String::from("  "),
+            };
+            for i in (row*5)..(row*5)+5 {
+                let curr_tile = &self.tiles[i];
+                match curr_tile.stable {
+                    true  => line = format!("{} Stable   ", line),
+                    false => line = format!("{}          ", line),
+                };
+                match curr_tile.east_fence {
+                    true  => line = format!("{}| ", line),
+                    false => line = format!("{}  ", line),
+                }
+            }
+
+            write!(f, "{}\n", line);
+        }
+        // Top line
+        let mut line = String::from("+");
+        for i in 10..15 {
+            let curr_tile = &self.tiles[i];
+            match curr_tile.south_fence {
+                true  => line = format!("{} --------- +", line),
+                false => line = format!("{}           +", line),
+            };
+        }
+        write!(f, "{}\n", line)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FarmTile {
+    house: Option<HouseType>,
+    stable: bool,
+    animal_type: Option<Animal>,
+    animal_count: usize,
+    north_fence: bool,
+    south_fence: bool,
+    east_fence: bool,
+    west_fence: bool,
+    field: Option<FieldTile>,
+    surrounding_tiles: Vec<usize>
+}
+
+impl FarmTile {
+    fn new() -> FarmTile {
+        FarmTile {
+            house: None,
+            stable: false,
+            animal_type: None,
+            animal_count: 0,
+            north_fence: false,
+            south_fence: false,
+            east_fence: false,
+            west_fence: false,
+            field: None,
+            surrounding_tiles: Vec::new()
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.house.is_none() && !self.stable && self.field.is_none()
+    }
+
+    fn plow(&mut self) {
+        self.field = Some(FieldTile::new());
+    }
+}
+
+#[derive(Debug, Clone)]
+struct FieldTile {
+    crop: Option<Crop>,
+    count: usize
+}
+
+impl FieldTile {
+    fn new() -> FieldTile {
+        FieldTile {
+            crop: None,
+            count: 0
+        }
+    }
+
+    fn new_with_crop(crop: Crop, count: usize) -> FieldTile {
+        FieldTile {
+            crop: Some(crop),
+            count: count
+        }
+    }
+
+    fn crop(&self) -> String {
+        match self.crop {
+            Some(Crop::Grain)     => String::from("Grain"),
+            Some(Crop::Vegetable) => String::from("Veg  "),
+            _                     => String::from("     ")
+        }
+    }
+
+    fn count(&self) -> usize {
+        self.count
+    }
+
+}
+
+#[derive(Debug, Clone)]
+enum Crop {
+    Grain,
+    Vegetable
 }

@@ -1,6 +1,7 @@
 extern crate boardgameai_rs;
 extern crate nim;
 extern crate agricola;
+extern crate rand;
 
 use boardgameai_rs::state::State;
 use boardgameai_rs::node::{NodeArena, NodeId};
@@ -11,6 +12,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::fs::File;
 use std::io::Read;
+use rand::Rng;
 
 fn random() -> usize {
     let mut urandom = File::open("/dev/urandom").ok().unwrap();
@@ -148,8 +150,25 @@ fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations
 fn main() {
     let arena = &mut NodeArena::new();
     // let mut state = NimState::new(10);
+    //
     let mut state = AgricolaState::new(2);
     println!("{}", state.board);
+
+    /*
+    let mut player_mat = PlayerMat::new();
+    println!("{}", player_mat);
+    */
+
+    /*
+    let mut rng = rand::thread_rng();
+    for _ in 0..8 {
+        let rand_num =  rng.gen::<usize>() % 60;
+        player_mat.place_fence(rand_num);
+        println!("i: {}", rand_num);
+        println!("{}", player_mat);
+    }
+    */
+
 
     /*
     println!("Before\n{}", state);
@@ -169,7 +188,7 @@ fn main() {
     */
 
     while state.clone().get_actions().len() > 0 {
-        let best_action = UCT(arena, state.clone(), 1000);
+        let best_action = UCT(arena, state.clone(), 5000);
         // println!("{}", arena.simple_display());
         // println!("Best action {:?}", best_action);
         state.do_action(best_action);

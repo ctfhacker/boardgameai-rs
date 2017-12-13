@@ -5,3 +5,4 @@ authors = ["thebarbershopper <cld251@gmail.com>"]
 
 [dependencies]
 boardgameai-rs = { path = "../../../boardgameai-rs" }
+rand = "*"

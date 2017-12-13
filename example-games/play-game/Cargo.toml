@@ -7,3 +7,4 @@ authors = ["thebarbershopper <cld251@gmail.com>"]
 nim = { path = "../nim" }
 agricola = { path = "../agricola" }
 boardgameai-rs = { path = "../../../boardgameai-rs" }
+rand = "*"
