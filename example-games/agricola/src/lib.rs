@@ -27,7 +27,8 @@ struct Player {
     total_actions: usize,
     actions_taken: Vec<String>,
     player_mat: PlayerMat,
-    house_type: HouseType
+    house_type: HouseType,
+    beggers: usize
 }
 
 impl Player {
@@ -48,7 +49,8 @@ impl Player {
             total_actions: 2,
             actions_taken: Vec::new(),
             player_mat: PlayerMat::new(),
-            house_type: HouseType::Wood
+            house_type: HouseType::Wood,
+            beggers: 0
         }
     }
 
@@ -61,7 +63,12 @@ impl Player {
             4   => result += 3,
             _   => result += 4
         }
-        match self.grain {
+        let grain_in_fields: usize = self.player_mat.tiles.iter()
+                                            .filter(|t| t.field.is_some())
+                                            .map(|t| t.clone().field.unwrap().count)
+                                            .sum();
+
+        match (self.grain + grain_in_fields) {
             0     => result -= 1,
             1|2|3 => result += 1,
             4|5   => result += 2,
@@ -103,14 +110,18 @@ impl Player {
 
         result -= empty_spaces.len() as i32;
 
+        /*
         let stables: Vec<&FarmTile> = self.player_mat.tiles.iter()
                                                            .filter(|&t| t.stable)
                                                            .collect(); 
 
         result += stables.len() as i32;
+        */
 
         // TODO fenced in stables
         // TODO Room types
+        result -= (self.beggers * 3) as i32;
+
         result += (self.total_actions * 3) as i32;
         result
     }
@@ -197,13 +208,63 @@ impl Player {
             self.wood -= 2;
         }
     }
+
+    fn build_stable(&mut self) {
+        if self.wood == 0 {
+            // Not enough wood to buy one stable
+            return;
+        }
+
+        let possibles: Vec<usize> = self.player_mat.tiles
+                                                .iter()
+                                                .enumerate()
+                                                .filter(|&(i, t)| t.is_empty())
+                                                .map(|(i, t)| i)
+                                                .collect();
+
+        if possibles.len() == 0 {
+            return;
+        }
+
+        let random_tile = rand::thread_rng().choose(&possibles).unwrap();
+        self.player_mat.tiles[*random_tile].stable();
+        self.wood -= 1;
+    }
+
+    fn sow(&mut self) {
+        let mut empty_fields: Vec<usize> = self.player_mat.tiles.iter()
+                                                                .enumerate()
+                                                                .filter(|&(i, t)| t.field.is_some() && t.clone().field.unwrap().count == 0)
+                                                                .map(|(i, f)| i)
+                                                                .collect();
+
+        while empty_fields.len() > 0 && self.vegetables > 0 {
+            let curr_field_index = empty_fields.pop().unwrap();
+            self.sow_veg(curr_field_index);
+            self.vegetables -= 1;
+        }
+
+        while empty_fields.len() > 0 && self.grain > 0 {
+            let curr_field_index = empty_fields.pop().unwrap();
+            self.sow_grain(curr_field_index);
+            self.grain -= 1;
+        }
+    }
+
+    fn sow_veg(&mut self, index: usize) {
+        self.player_mat.tiles[index].sow_veg();
+    }
+
+    fn sow_grain(&mut self, index: usize) {
+        self.player_mat.tiles[index].sow_grain();
+    }
 }
 
 impl Display for Player {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {}]\n{}", 
+        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {} Beggers: {}]\n{}", 
                     self.food, self.grain, self.wood, self.clay, self.reed, 
-                    self.stone, self.actions, self.total_actions, self.fields, self.player_mat)
+                    self.stone, self.actions, self.total_actions, self.fields, self.beggers, self.player_mat)
     }
 }
 
@@ -291,11 +352,15 @@ pub enum AgricolaAction {
     Grain = 3,
     Plow = 4,
     BuildStable_BakeBread = 5,
+    BuildStable = 19,
+    BakeBread_NoStable = 20,
     DayLaborer_Food_Wood = 6,
     DayLaborer_Food_Clay = 7,
     DayLaborer_Food_Reed = 8,
     DayLaborer_Food_Stone = 9,
     Sow_BakeBread = 10,
+    Sow = 17,
+    BakeBread_NotSow = 18,
     Wood = 11,
     Clay = 12,
     Reed = 13,
@@ -312,11 +377,15 @@ impl AgricolaAction {
             3 => Some(AgricolaAction::Grain),
             4 => Some(AgricolaAction::Plow),
             5 => Some(AgricolaAction::BuildStable_BakeBread),
+            19 => Some(AgricolaAction::BuildStable),
+            20 => Some(AgricolaAction::BakeBread_NoStable),
             6 => Some(AgricolaAction::DayLaborer_Food_Wood),
             7 => Some(AgricolaAction::DayLaborer_Food_Clay),
             8 => Some(AgricolaAction::DayLaborer_Food_Reed),
             9 => Some(AgricolaAction::DayLaborer_Food_Stone),
             10 => Some(AgricolaAction::Sow_BakeBread),
+            17 => Some(AgricolaAction::Sow),
+            18 => Some(AgricolaAction::BakeBread_NotSow),
             11 => Some(AgricolaAction::Wood),
             12 => Some(AgricolaAction::Clay),
             13 => Some(AgricolaAction::Reed),
@@ -365,8 +434,16 @@ impl State for AgricolaState {
                     &AgricolaTile::StartingPlayer_Food => actions.push(AgricolaAction::StartingPlayer_Food as u32),
                     &AgricolaTile::Grain => actions.push(AgricolaAction::Grain as u32),
                     &AgricolaTile::Plow  => actions.push(AgricolaAction::Plow as u32),
-                    &AgricolaTile::BuildStable_BakeBread  => actions.push(AgricolaAction::BuildStable_BakeBread as u32),
-                    &AgricolaTile::Sow_BakeBread  => actions.push(AgricolaAction::Sow_BakeBread as u32),
+                    &AgricolaTile::BuildStable_BakeBread  => {
+                        actions.push(AgricolaAction::BuildStable_BakeBread as u32);
+                        actions.push(AgricolaAction::BuildStable as u32);
+                        actions.push(AgricolaAction::BakeBread_NoStable as u32);
+                    }
+                    &AgricolaTile::Sow_BakeBread  => {
+                        actions.push(AgricolaAction::Sow_BakeBread as u32);
+                        actions.push(AgricolaAction::BakeBread_NotSow as u32);
+                        actions.push(AgricolaAction::Sow as u32);
+                    },
                     &AgricolaTile::Wood  => actions.push(AgricolaAction::Wood as u32),
                     &AgricolaTile::Clay  => actions.push(AgricolaAction::Clay as u32),
                     &AgricolaTile::Reed  => actions.push(AgricolaAction::Reed as u32),
@@ -477,10 +554,24 @@ impl State for AgricolaState {
                         _ => panic!("Should never get here.. Day Laborer only has 4 choices..")
                     }
                 },
+                Some(AgricolaAction::Sow) |
+                Some(AgricolaAction::BakeBread_NotSow) |
                 Some(AgricolaAction::Sow_BakeBread) => {
-                    // println!("In Sow + BakeBread.. doing nothing");
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Sow_BakeBread).unwrap());
-                    action_taken = format!("Sow and Bake Bread").to_string();
+                    match agricola_action {
+                        Some(AgricolaAction::Sow) => {
+                            player.sow();
+                            action_taken = format!("Sow").to_string();
+                        },
+                        Some(AgricolaAction::BakeBread_NotSow) => {
+                            action_taken = format!("Bake Bread and not Sow").to_string();
+                        },
+                        Some(AgricolaAction::Sow_BakeBread) =>  {
+                            player.sow();
+                            action_taken = format!("Sow and Bake Bread").to_string();
+                        },
+                        _ => panic!("Should never get here.. Sow and Bake Bread only had 3 choices..")
+                    }
                 },
                 Some(AgricolaAction::BuildRoom) |
                 Some(AgricolaAction::BuildStables) |
@@ -520,6 +611,8 @@ impl State for AgricolaState {
                     player.plow();
                     player.fields += 1;
                 },
+                Some(AgricolaAction::BuildStable) |
+                Some(AgricolaAction::BakeBread_NoStable) |
                 Some(AgricolaAction::BuildStable_BakeBread) => {
                     // println!("In Build Stable + Bake Bread.. doing nothing");
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::BuildStable_BakeBread).unwrap());
@@ -597,7 +690,7 @@ impl AgricolaState {
             starting_player_token: None,
             board: Board::new(),
             rounds: 1,
-            total_rounds: 10,
+            total_rounds: 15,
             actions_taken: Vec::new()
         }
     }
@@ -627,6 +720,57 @@ impl AgricolaState {
 
         // Reset the board
         self.board.reset();
+
+        match self.rounds {
+            3|6|8|10|12|13 => {
+                // Field Phase
+                for ref mut player in self.players.iter_mut() {
+                    for ref mut curr_tile in player.player_mat.tiles.iter_mut() {
+                        let mut empty = false;
+                        if let Some(ref mut field) = curr_tile.field {
+                            match field.crop {
+                                Some(Crop::Grain) => {
+                                    player.grain += 1;
+                                },
+                                Some(Crop::Vegetable) => {
+                                    player.vegetables += 1;
+                                },
+                                None => { continue; },
+                            }
+                            field.count -= 1;
+                            if field.count == 0 {
+                                empty = true;
+                            }
+                        };
+                        if empty {
+                            curr_tile.field = None;
+                        }
+                    }
+                }
+                
+                // Feeding Phase
+                for mut player in self.players.iter_mut() {
+                    if player.food >= player.total_actions * 2 {
+                        player.food -= player.total_actions * 2;
+                    } else {
+                        let mut food_needed = (player.total_actions * 2) - player.food;
+                        player.food = 0;
+                        loop {
+                            if food_needed == 0 || player.grain == 0{
+                                break;
+                            }
+                            if player.grain > 0 {
+                                player.grain -= 1;
+                                food_needed -= 1;
+                            }
+                        }
+                        player.beggers += food_needed;
+                    }
+                }
+                // Breeding Phase
+            },
+            _ => {}
+        }
 
         self.rounds += 1;
     }
@@ -980,6 +1124,20 @@ impl FarmTile {
     fn stable(&mut self) {
         self.stable = true;
     }
+
+    fn sow_veg(&mut self) {
+        if let Some(ref mut field) = self.field {
+            field.crop = Some(Crop::Vegetable);
+            field.count = 2;
+        }
+    }
+
+    fn sow_grain(&mut self) {
+        if let Some(ref mut field) = self.field {
+            field.crop = Some(Crop::Grain);
+            field.count = 3;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1015,6 +1173,12 @@ impl FieldTile {
         self.count
     }
 
+    fn is_empty(&self) -> bool {
+        match self.crop {
+            None => false,
+            Some(ref field) => true
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
