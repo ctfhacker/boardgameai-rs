@@ -279,8 +279,9 @@ impl Player {
 
 impl Display for Player {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {} Beggers: {}]\n",
-                self.food, self.grains, self.wood, self.clay, self.reed, self.stone, self.actions, self.total_actions, self.fields, self.beggers);
+        write!(f, "[Food: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {} Beggers: {}]\n",
+                self.food, self.wood, self.clay, self.reed, self.stone, self.actions, self.total_actions, self.fields, self.beggers);
+        write!(f, "[Grain: {} Veg: {}]\n", self.grains, self.vegetables);
         write!(f, "[Sheep: {} Boar: {} Cattle: {}]\n", self.sheep, self.boar, self.cattle);
         write!(f, "{}", self.player_mat)
     }
@@ -461,6 +462,8 @@ pub enum AgricolaAction {
     Cattle = 29,
     Stone_2 = 30,
     Plow_Sow = 31,
+    Plow_NoSow = 34,
+    Sow_NoPlow = 35,
     FamilyGrowth_NoSpace = 32,
     Renovation_Fences = 33,
 }
@@ -499,6 +502,8 @@ impl AgricolaAction {
             29 => Some(AgricolaAction::Cattle),
             30 => Some(AgricolaAction::Stone_2),
             31 => Some(AgricolaAction::Plow_Sow),
+            34 => Some(AgricolaAction::Plow_NoSow),
+            35 => Some(AgricolaAction::Sow_NoPlow),
             32 => Some(AgricolaAction::FamilyGrowth_NoSpace),
             33 => Some(AgricolaAction::Renovation_Fences),
             _ => None
@@ -569,13 +574,16 @@ impl State for AgricolaState {
                     &AgricolaTile::Boar  => actions.push(AgricolaAction::Boar as u32),
                     &AgricolaTile::Cattle  => actions.push(AgricolaAction::Cattle as u32),
                     &AgricolaTile::Stone_2  => actions.push(AgricolaAction::Stone_2 as u32),
-                    &AgricolaTile::Plow_Sow  => actions.push(AgricolaAction::Plow_Sow as u32),
+                    &AgricolaTile::Plow_Sow  => {
+                        actions.push(AgricolaAction::Plow_Sow as u32);
+                        actions.push(AgricolaAction::Plow_NoSow as u32);
+                        actions.push(AgricolaAction::Sow_NoPlow as u32);
+                    },
                     &AgricolaTile::FamilyGrowth_NoSpace  => actions.push(AgricolaAction::FamilyGrowth_NoSpace as u32),
                     &AgricolaTile::Renovation_Fences  => actions.push(AgricolaAction::Renovation_Fences as u32),
                 }
             }
         }
-        // println!("Available actions: {:?}", actions);
 
         actions
     }
@@ -596,7 +604,7 @@ impl State for AgricolaState {
         if self.players[self.current_player].actions == 0 {
             panic!("Oh noes.. attempting to play a piece with no actions. :(");
         }
-        // println!("[R:{} P:{}] Action: {:?}", self.rounds, self.current_player, AgricolaAction::from_u32(action));
+        // println!("[R:{} P:{}] Action: {} {:?}", self.rounds, self.current_player, action, AgricolaAction::from_u32(action));
         let player_index = self.current_player;
         let num_players = self.players.len();
         let mut action_taken = String::from("");
@@ -730,9 +738,9 @@ impl State for AgricolaState {
                 },
                 Some(AgricolaAction::Plow) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
-                    action_taken = format!("Plow").to_string();
                     player.plow();
                     player.fields += 1;
+                    action_taken = format!("Plow").to_string();
                 },
                 Some(AgricolaAction::BuildStable) |
                 Some(AgricolaAction::BakeBread_NoStable) |
@@ -852,9 +860,28 @@ impl State for AgricolaState {
                     action_taken = format!("(Second) Stone +{}", curr_tile.items).to_string();
                     curr_tile.items = 0;
                 },
+                Some(AgricolaAction::Plow_NoSow) |
+                Some(AgricolaAction::Sow_NoPlow) |
                 Some(AgricolaAction::Plow_Sow) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow_Sow).unwrap());
-                    action_taken = format!("Plow_Sow").to_string();
+                    match agricola_action {
+                        Some(AgricolaAction::Plow_NoSow) => {
+                            player.plow();
+                            player.fields += 1;
+                            action_taken = format!("Plow but No Sow").to_string();
+                        }
+                        Some(AgricolaAction::Sow_NoPlow) => {
+                            player.sow();
+                            action_taken = format!("Sow but No Plow").to_string();
+                        }
+                        Some(AgricolaAction::Plow_Sow) => {
+                            player.plow();
+                            player.fields += 1;
+                            player.sow();
+                            action_taken = format!("Plow and Sow").to_string();
+                        },
+                        _ => panic!("[Plow_Sow] Can never reach here..")
+                    }
                 },
                 Some(AgricolaAction::FamilyGrowth_NoSpace) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth_NoSpace).unwrap());
@@ -990,7 +1017,7 @@ impl AgricolaState {
         self.board.reset();
 
         match self.rounds {
-            3|6|8|10|12|13 => {
+            4|7|9|11|13|14 => {
                 // Field Phase
                 for ref mut player in self.players.iter_mut() {
                     for ref mut curr_tile in player.player_mat.tiles.iter_mut() {

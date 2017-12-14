@@ -191,13 +191,12 @@ fn main() {
         let mut best_action;
         if state.current_player == 0 {
             // First player is "better" with more iterations
-            best_action = UCT(arena, state.clone(), 10000);
+            best_action = UCT(arena, state.clone(), 100);
         } else {
             // "dumb" players
-            best_action = UCT(arena, state.clone(), 10000);
+            best_action = UCT(arena, state.clone(), 100);
         }
 
-        // println!("{}", arena.simple_display());
         println!("Best action {:?}", AgricolaAction::from_u32(best_action));
         state.do_action(best_action);
     }
