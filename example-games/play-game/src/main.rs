@@ -191,10 +191,10 @@ fn main() {
         let mut best_action;
         if state.current_player == 0 {
             // First player is "better" with more iterations
-            best_action = UCT(arena, state.clone(), 1000);
+            best_action = UCT(arena, state.clone(), 10000);
         } else {
             // "dumb" players
-            best_action = UCT(arena, state.clone(), 50);
+            best_action = UCT(arena, state.clone(), 10000);
         }
 
         // println!("{}", arena.simple_display());

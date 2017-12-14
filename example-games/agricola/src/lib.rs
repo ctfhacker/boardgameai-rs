@@ -14,7 +14,7 @@ use rand::{thread_rng, Rng};
 struct Player {
     food: usize,
     fields: usize,
-    grain: usize,
+    grains: usize,
     vegetables: usize,
     wood: usize,
     clay: usize,
@@ -28,7 +28,8 @@ struct Player {
     actions_taken: Vec<String>,
     player_mat: PlayerMat,
     house_type: HouseType,
-    beggers: usize
+    beggers: usize,
+    children: usize
 }
 
 impl Player {
@@ -36,7 +37,7 @@ impl Player {
         Player {
             food: food,
             fields: 0,
-            grain: 0,
+            grains: 0,
             vegetables: 0,
             wood: 0,
             clay: 0,
@@ -50,7 +51,8 @@ impl Player {
             actions_taken: Vec::new(),
             player_mat: PlayerMat::new(),
             house_type: HouseType::Wood,
-            beggers: 0
+            beggers: 0,
+            children: 0
         }
     }
 
@@ -68,7 +70,7 @@ impl Player {
                                             .map(|t| t.clone().field.unwrap().count)
                                             .sum();
 
-        match (self.grain + grain_in_fields) {
+        match (self.grains + grain_in_fields) {
             0     => result -= 1,
             1|2|3 => result += 1,
             4|5   => result += 2,
@@ -110,16 +112,17 @@ impl Player {
 
         result -= empty_spaces.len() as i32;
 
-        /*
-        let stables: Vec<&FarmTile> = self.player_mat.tiles.iter()
-                                                           .filter(|&t| t.stable)
-                                                           .collect(); 
-
-        result += stables.len() as i32;
-        */
-
         // TODO fenced in stables
-        // TODO Room types
+        let num_rooms = self.player_mat.tiles.iter()
+                                             .filter(|t| t.house.is_some())
+                                             .count();
+        
+        match self.house_type {
+            HouseType::Wood => {},
+            HouseType::Clay => result += (num_rooms * 1) as i32,
+            HouseType::Stone => result += (num_rooms * 2) as i32,
+        }
+
         result -= (self.beggers * 3) as i32;
 
         result += (self.total_actions * 3) as i32;
@@ -244,10 +247,10 @@ impl Player {
             self.vegetables -= 1;
         }
 
-        while empty_fields.len() > 0 && self.grain > 0 {
+        while empty_fields.len() > 0 && self.grains > 0 {
             let curr_field_index = empty_fields.pop().unwrap();
             self.sow_grain(curr_field_index);
-            self.grain -= 1;
+            self.grains -= 1;
         }
     }
 
@@ -258,13 +261,28 @@ impl Player {
     fn sow_grain(&mut self, index: usize) {
         self.player_mat.tiles[index].sow_grain();
     }
+
+    fn upgrade_house(&mut self) {
+        for tile in self.player_mat.tiles.iter_mut() {
+            if tile.house.is_some() {
+                tile.upgrade()
+            }
+        }
+
+        match self.house_type {
+            HouseType::Wood => self.house_type = HouseType::Clay,
+            HouseType::Clay => self.house_type = HouseType::Stone,
+            HouseType::Stone => {}
+        }
+    }
 }
 
 impl Display for Player {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {} Beggers: {}]\n{}", 
-                    self.food, self.grain, self.wood, self.clay, self.reed, 
-                    self.stone, self.actions, self.total_actions, self.fields, self.beggers, self.player_mat)
+        write!(f, "[Food: {} Grain: {} Wood: {} Clay: {} Reed: {} Stone: {} Actions: {}/{} Fields: {} Beggers: {}]\n",
+                self.food, self.grains, self.wood, self.clay, self.reed, self.stone, self.actions, self.total_actions, self.fields, self.beggers);
+        write!(f, "[Sheep: {} Boar: {} Cattle: {}]\n", self.sheep, self.boar, self.cattle);
+        write!(f, "{}", self.player_mat)
     }
 }
 
@@ -284,11 +302,53 @@ struct BoardTile {
 
 #[derive(Debug, Clone)]
 pub struct Board {
-    tiles: HashMap<AgricolaTile, Box<BoardTile>>
+    tiles: HashMap<AgricolaTile, Box<BoardTile>>,
+    future_tiles: Vec<(AgricolaTile, Box<BoardTile>)>,
 }
 
 impl Board {
     fn new() -> Board {
+        let mut future_tiles = Vec::new();
+
+        let round_1_tiles = vec!(
+            (AgricolaTile::Sow_BakeBread, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::Fences, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::MajorImprovement, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::Sheep, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+        );
+
+        let round_2_tiles = vec!(
+            (AgricolaTile::FamilyGrowth, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::Stone_1, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+            (AgricolaTile::Renovation_MajorImprovement, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+        );
+
+        let round_3_tiles = vec!(
+            (AgricolaTile::Vegetable, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::Boar, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+        );
+
+        let round_4_tiles = vec!(
+            (AgricolaTile::Cattle, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+            (AgricolaTile::Stone_2, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+        );
+
+        let round_5_tiles = vec!(
+            (AgricolaTile::Plow_Sow, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::FamilyGrowth_NoSpace, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+        );
+
+        let round_6_tiles = vec!(
+            (AgricolaTile::Renovation_Fences, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+        );
+
+        future_tiles.extend(round_6_tiles);
+        future_tiles.extend(round_5_tiles);
+        future_tiles.extend(round_4_tiles);
+        future_tiles.extend(round_3_tiles);
+        future_tiles.extend(round_2_tiles);
+        future_tiles.extend(round_1_tiles);
+
         let mut board = HashMap::new();
         board.insert(AgricolaTile::BuildRoom_BuildStables, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::StartingPlayer_Food, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
@@ -296,13 +356,20 @@ impl Board {
         board.insert(AgricolaTile::Plow, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::BuildStable_BakeBread, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::DayLaborer, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
-        board.insert(AgricolaTile::Sow_BakeBread, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::Wood, Box::new(BoardTile { occupied: None, items: 3, reset_amount: 3}));
         board.insert(AgricolaTile::Clay, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
         board.insert(AgricolaTile::Reed, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
         board.insert(AgricolaTile::Fishing, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
+
+        // Insert first action
+        if let Some((next_card, next_tile)) = future_tiles.pop() {
+            // println!("Next action: {:?} {:?}", next_card, next_tile);
+            board.insert(next_card, next_tile);
+        }
+
         Board {
             tiles: board,
+            future_tiles: future_tiles
         }
     }
 
@@ -311,6 +378,11 @@ impl Board {
             // println!("{:?}: {:?} -> {:?}", name, tile.items, tile.items+tile.reset_amount);
             tile.items += tile.reset_amount;
             tile.occupied = None;
+        }
+
+        if let Some((next_card, next_tile)) = self.future_tiles.pop() {
+            // println!("Next action: {:?} {:?}", next_card, next_tile);
+            self.tiles.insert(next_card, next_tile);
         }
     }
 }
@@ -341,6 +413,19 @@ enum AgricolaTile {
     Clay = 9,
     Reed = 10,
     Fishing = 11,
+    Fences = 12,
+    MajorImprovement = 13,
+    Sheep = 14,
+    FamilyGrowth = 15,
+    Stone_1 = 16,
+    Renovation_MajorImprovement = 17,
+    Vegetable = 18,
+    Boar = 19,
+    Cattle = 20,
+    Stone_2 = 21,
+    Plow_Sow = 22,
+    FamilyGrowth_NoSpace = 23,
+    Renovation_Fences = 24
 }
 
 #[derive(Debug)]
@@ -365,6 +450,19 @@ pub enum AgricolaAction {
     Clay = 12,
     Reed = 13,
     Fishing = 14,
+    Fences = 21,
+    MajorImprovement = 22,
+    Sheep = 23,
+    FamilyGrowth = 24,
+    Stone_1 = 25,
+    Renovation_MajorImprovement = 26,
+    Vegetable = 27,
+    Boar = 28,
+    Cattle = 29,
+    Stone_2 = 30,
+    Plow_Sow = 31,
+    FamilyGrowth_NoSpace = 32,
+    Renovation_Fences = 33,
 }
 
 impl AgricolaAction {
@@ -390,6 +488,19 @@ impl AgricolaAction {
             12 => Some(AgricolaAction::Clay),
             13 => Some(AgricolaAction::Reed),
             14 => Some(AgricolaAction::Fishing),
+            21 => Some(AgricolaAction::Fences),
+            22 => Some(AgricolaAction::MajorImprovement),
+            23 => Some(AgricolaAction::Sheep),
+            24 => Some(AgricolaAction::FamilyGrowth),
+            25 => Some(AgricolaAction::Stone_1),
+            26 => Some(AgricolaAction::Renovation_MajorImprovement),
+            27 => Some(AgricolaAction::Vegetable),
+            28 => Some(AgricolaAction::Boar),
+            29 => Some(AgricolaAction::Cattle),
+            30 => Some(AgricolaAction::Stone_2),
+            31 => Some(AgricolaAction::Plow_Sow),
+            32 => Some(AgricolaAction::FamilyGrowth_NoSpace),
+            33 => Some(AgricolaAction::Renovation_Fences),
             _ => None
         }
     }
@@ -448,6 +559,19 @@ impl State for AgricolaState {
                     &AgricolaTile::Clay  => actions.push(AgricolaAction::Clay as u32),
                     &AgricolaTile::Reed  => actions.push(AgricolaAction::Reed as u32),
                     &AgricolaTile::Fishing  => actions.push(AgricolaAction::Fishing as u32),
+                    &AgricolaTile::Fences  => actions.push(AgricolaAction::Fences as u32),
+                    &AgricolaTile::MajorImprovement  => actions.push(AgricolaAction::MajorImprovement as u32),
+                    &AgricolaTile::Sheep  => actions.push(AgricolaAction::Sheep as u32),
+                    &AgricolaTile::FamilyGrowth  => actions.push(AgricolaAction::FamilyGrowth as u32),
+                    &AgricolaTile::Stone_1  => actions.push(AgricolaAction::Stone_1 as u32),
+                    &AgricolaTile::Renovation_MajorImprovement  => actions.push(AgricolaAction::Renovation_MajorImprovement as u32),
+                    &AgricolaTile::Vegetable  => actions.push(AgricolaAction::Vegetable as u32),
+                    &AgricolaTile::Boar  => actions.push(AgricolaAction::Boar as u32),
+                    &AgricolaTile::Cattle  => actions.push(AgricolaAction::Cattle as u32),
+                    &AgricolaTile::Stone_2  => actions.push(AgricolaAction::Stone_2 as u32),
+                    &AgricolaTile::Plow_Sow  => actions.push(AgricolaAction::Plow_Sow as u32),
+                    &AgricolaTile::FamilyGrowth_NoSpace  => actions.push(AgricolaAction::FamilyGrowth_NoSpace as u32),
+                    &AgricolaTile::Renovation_Fences  => actions.push(AgricolaAction::Renovation_Fences as u32),
                 }
             }
         }
@@ -486,7 +610,7 @@ impl State for AgricolaState {
                     if !curr_tile.occupied.is_none() {
                         panic!("Player {} is bad.. Grain is already taken", player_index);
                     }
-                    player.grain += 1;
+                    player.grains += 1;
                     action_taken = String::from("Grain +1");
                 },
                 Some(AgricolaAction::Wood) => {
@@ -605,7 +729,6 @@ impl State for AgricolaState {
                     self.starting_player_token = Some(self.current_player);
                 },
                 Some(AgricolaAction::Plow) => {
-                    // println!("In Plow.. doing nothing");
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
                     action_taken = format!("Plow").to_string();
                     player.plow();
@@ -614,14 +737,159 @@ impl State for AgricolaState {
                 Some(AgricolaAction::BuildStable) |
                 Some(AgricolaAction::BakeBread_NoStable) |
                 Some(AgricolaAction::BuildStable_BakeBread) => {
-                    // println!("In Build Stable + Bake Bread.. doing nothing");
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::BuildStable_BakeBread).unwrap());
-                    action_taken = format!("Build Stable and Bake Bread").to_string();
+                    match agricola_action {
+                        Some(AgricolaAction::BuildStable) => {
+                            player.build_stable();
+                            action_taken = format!("Build 1 stable").to_string();
+                        }
+                        Some(AgricolaAction::BakeBread_NoStable) => {
+                            action_taken = format!("Bake Bread").to_string();
+                        }
+                        Some(AgricolaAction::BuildStable_BakeBread) => {
+                            player.build_stable();
+                            action_taken = format!("Build Stable and Bake Bread").to_string();
+                        },
+                        _ => panic!("[BuildStable_BakeBread] Can never reach here..")
+                    }
+                },
+                Some(AgricolaAction::Sheep) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Sheep).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. sheep is already taken", player_index);
+                    }
+                    player.sheep += curr_tile.items;
+                    action_taken = format!("Sheep +{}", curr_tile.items).to_string();
+                    curr_tile.items = 0;
+                },
+                Some(AgricolaAction::MajorImprovement) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::MajorImprovement).unwrap());
+                    action_taken = format!("Major Improvement").to_string();
+                },
+                Some(AgricolaAction::Fences) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Fences).unwrap());
+                    action_taken = format!("Fences").to_string();
+                },
+                Some(AgricolaAction::FamilyGrowth) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth).unwrap());
+                    let num_rooms = player.player_mat.tiles.iter()
+                                                           .filter(|t| t.house.is_some())
+                                                           .count();
+                    if num_rooms > player.total_actions {
+                        player.children = 1;
+                    }
+                    action_taken = format!("Family Growth").to_string();
+                },
+                Some(AgricolaAction::Stone_1) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Stone_1).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. first Stone is already taken", player_index);
+                    }
+                    player.stone += curr_tile.items;
+                    action_taken = format!("(First) Stone +{}", curr_tile.items).to_string();
+                    curr_tile.items = 0;
+                },
+                Some(AgricolaAction::Renovation_MajorImprovement) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Renovation_MajorImprovement).unwrap());
+
+                    let num_rooms = player.player_mat.tiles.iter()
+                                                           .filter(|t| t.house.is_some())
+                                                           .count();
+
+
+                    match player.house_type {
+                        HouseType::Wood => {
+                            if player.clay >= num_rooms && player.reed >= 1 {
+                                player.clay -= num_rooms;
+                                player.reed -= 1;
+                                player.upgrade_house();
+                            }
+                        },
+                        HouseType::Clay => {
+                            if player.stone >= num_rooms && player.reed >= 1 {
+                                player.stone -= num_rooms;
+                                player.reed -= 1;
+                                player.upgrade_house();
+                            }
+                        },
+                        HouseType::Stone => {}
+                    }
+
+                    action_taken = format!("Renovation and MajorImprovement").to_string();
+                },
+                Some(AgricolaAction::Vegetable) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Vegetable).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. vegetable is already taken", player_index);
+                    }
+                    player.vegetables += 1;
+                    action_taken = format!("Vegetable +1").to_string();
+                },
+                Some(AgricolaAction::Boar) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Boar).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. Boar is already taken", player_index);
+                    }
+                    player.boar += curr_tile.items;
+                    action_taken = format!("Boar +{}", curr_tile.items).to_string();
+                    curr_tile.items = 0;
+                },
+                Some(AgricolaAction::Cattle) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Cattle).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. Cattle is already taken", player_index);
+                    }
+                    player.cattle += curr_tile.items;
+                    action_taken = format!("Cattle +{}", curr_tile.items).to_string();
+                    curr_tile.items = 0;
+                },
+                Some(AgricolaAction::Stone_2) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Stone_2).unwrap());
+                    if !curr_tile.occupied.is_none() {
+                        panic!("Player {} is bad.. second Stone is already taken", player_index);
+                    }
+                    player.stone += curr_tile.items;
+                    action_taken = format!("(Second) Stone +{}", curr_tile.items).to_string();
+                    curr_tile.items = 0;
+                },
+                Some(AgricolaAction::Plow_Sow) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow_Sow).unwrap());
+                    action_taken = format!("Plow_Sow").to_string();
+                },
+                Some(AgricolaAction::FamilyGrowth_NoSpace) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth_NoSpace).unwrap());
+                    action_taken = format!("FamilyGrowth_NoSpace").to_string();
+                },
+                Some(AgricolaAction::Renovation_Fences) => {
+                    curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Renovation_Fences).unwrap());
+                    let num_rooms = player.player_mat.tiles.iter()
+                                                           .filter(|t| t.house.is_some())
+                                                           .count();
+
+
+                    match player.house_type {
+                        HouseType::Wood => {
+                            if player.clay >= num_rooms && player.reed >= 1 {
+                                player.clay -= num_rooms;
+                                player.reed -= 1;
+                                player.upgrade_house();
+                            }
+                        },
+                        HouseType::Clay => {
+                            if player.stone >= num_rooms && player.reed >= 1 {
+                                player.stone -= num_rooms;
+                                player.reed -= 1;
+                                player.upgrade_house();
+                            }
+                        },
+                        HouseType::Stone => {}
+                    }
+                    action_taken = format!("Renovation and Fences").to_string();
                 },
                 _ => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
                     unimplemented!();
-                }
+                },
             }
 
             // println!("Action: {:?} Curr_tile: {:?}", agricola_action, curr_tile);
@@ -690,7 +958,7 @@ impl AgricolaState {
             starting_player_token: None,
             board: Board::new(),
             rounds: 1,
-            total_rounds: 15,
+            total_rounds: 14,
             actions_taken: Vec::new()
         }
     }
@@ -730,7 +998,7 @@ impl AgricolaState {
                         if let Some(ref mut field) = curr_tile.field {
                             match field.crop {
                                 Some(Crop::Grain) => {
-                                    player.grain += 1;
+                                    player.grains += 1;
                                 },
                                 Some(Crop::Vegetable) => {
                                     player.vegetables += 1;
@@ -750,26 +1018,44 @@ impl AgricolaState {
                 
                 // Feeding Phase
                 for mut player in self.players.iter_mut() {
-                    if player.food >= player.total_actions * 2 {
-                        player.food -= player.total_actions * 2;
+                    if player.food >= (player.total_actions * 2) + (player.children) {
+                        player.food -= player.total_actions * 2 + (player.children);
                     } else {
-                        let mut food_needed = (player.total_actions * 2) - player.food;
+                        let mut food_needed = (player.total_actions * 2) + (player.children) - player.food;
                         player.food = 0;
                         loop {
-                            if food_needed == 0 || player.grain == 0{
+                            if food_needed == 0 || player.grains == 0 {
                                 break;
                             }
-                            if player.grain > 0 {
-                                player.grain -= 1;
+                            if player.grains > 0 {
+                                player.grains -= 1;
                                 food_needed -= 1;
                             }
                         }
                         player.beggers += food_needed;
                     }
                 }
+
                 // Breeding Phase
+                for mut player in self.players.iter_mut() {
+                    if player.sheep >= 2 {
+                        player.sheep += 1;
+                    }
+                    if player.boar >= 2 {
+                        player.boar += 1;
+                    }
+                    if player.cattle >= 2 {
+                        player.cattle += 1;
+                    }
+                }
             },
             _ => {}
+        }
+        for mut player in self.players.iter_mut() {
+            if player.children == 1 {
+                player.total_actions += 1;
+                player.children = 0;
+            }
         }
 
         self.rounds += 1;
@@ -1136,6 +1422,14 @@ impl FarmTile {
         if let Some(ref mut field) = self.field {
             field.crop = Some(Crop::Grain);
             field.count = 3;
+        }
+    }
+
+    fn upgrade(&mut self) {
+        match self.house {
+            Some(HouseType::Wood) => self.house = Some(HouseType::Clay),
+            Some(HouseType::Clay) => self.house = Some(HouseType::Stone),
+            _ => {},
         }
     }
 }
