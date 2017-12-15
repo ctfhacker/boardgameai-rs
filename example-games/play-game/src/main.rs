@@ -154,47 +154,14 @@ fn main() {
     let mut state = AgricolaState::new(2);
     println!("{}", state.board);
 
-    /*
-    let mut player_mat = PlayerMat::new();
-    println!("{}", player_mat);
-    */
-
-    /*
-    let mut rng = rand::thread_rng();
-    for _ in 0..8 {
-        let rand_num =  rng.gen::<usize>() % 60;
-        player_mat.place_fence(rand_num);
-        println!("i: {}", rand_num);
-        println!("{}", player_mat);
-    }
-    */
-
-
-    /*
-    println!("Before\n{}", state);
-    // Round 1
-    state.do_action(AgricolaAction::StartingPlayer_Food as u32);
-    println!("{:?}", state.get_action_strings());
-    state.do_action(AgricolaAction::Grain as u32);
-    state.do_action(AgricolaAction::Wood as u32);
-    state.do_action(AgricolaAction::Grain as u32);
-    println!("{}", state);
-    // Round 2
-    state.do_action(AgricolaAction::Grain as u32);
-    state.do_action(AgricolaAction::Grain as u32);
-    state.do_action(AgricolaAction::Grain as u32);
-    state.do_action(AgricolaAction::Grain as u32);
-    println!("{}", state);
-    */
-
     while state.clone().get_actions().len() > 0 {
         let mut best_action;
         if state.current_player == 0 {
             // First player is "better" with more iterations
-            best_action = UCT(arena, state.clone(), 100);
+            best_action = UCT(arena, state.clone(), 1000);
         } else {
             // "dumb" players
-            best_action = UCT(arena, state.clone(), 100);
+            best_action = UCT(arena, state.clone(), 1000);
         }
 
         println!("Best action {:?}", AgricolaAction::from_u32(best_action));
