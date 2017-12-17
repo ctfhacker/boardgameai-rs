@@ -1,4 +1,6 @@
 #![feature(exclusive_range_pattern)]
+#[macro_use]
+extern crate lazy_static;
 extern crate boardgameai_rs;
 extern crate rand;
 
@@ -9,6 +11,70 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Display;
 use rand::{thread_rng, Rng, sample};
+
+lazy_static!{
+    // Create a HashMap of each fence edge that correlates the surrounding
+    // fences. By checking if both ends of a fence are occupied, we can
+    // guarentee we have a fence that is closed.
+    //
+    // For example: Fence 6 North:
+    // One end point has (1 West, 6 West, 5 North) and 
+    // the other end point has (1 East, 6 east, 7 North)
+    //
+    // We can also leverage this mapping to randomly select a fence to place.
+    // Flatten the two endpoint vectors to have a vector of all possible
+    // surrounding fences and then randomly select one of those, ensures
+    // that the random fence structure is contiguous.
+    // static ref FENCE_MAP: HashMap<(&(usize, &str), &str> = {
+    static ref FENCE_MAP: HashMap<(usize, &'static str), (Vec<(usize, &'static str)>, Vec<(usize, &'static str)>)> = {
+        let mut adjacent_fences = HashMap::new();
+        adjacent_fences.insert((0, "north"), (vec!((0, "west")), vec!((0, "east"), (1, "north"))));
+        adjacent_fences.insert((1, "north"), (vec!((0, "north"), (1, "west")), vec!((1, "east"), (2, "north"))));
+        adjacent_fences.insert((2, "north"), (vec!((1, "north"), (2, "west")), vec!((2, "east"), (3, "north"))));
+        adjacent_fences.insert((3, "north"), (vec!((2, "north"), (3, "west")), vec!((3, "east"), (4, "north"))));
+        adjacent_fences.insert((4, "north"), (vec!((3, "north"), (4, "west")), vec!((4, "east"))));
+
+        adjacent_fences.insert((0, "west"), (vec!((0, "north")), vec!((0, "south"), (5, "west"))));
+        adjacent_fences.insert((0, "east"), (vec!((0, "north")), vec!((0, "south"), (1, "north"), (1, "south"), (5, "east"))));
+        adjacent_fences.insert((1, "east"), (vec!((1, "north")), vec!((1, "south"), (2, "north"), (2, "south"), (6, "east"))));
+        adjacent_fences.insert((2, "east"), (vec!((2, "north")), vec!((2, "south"), (3, "north"), (3, "south"), (7, "east"))));
+        adjacent_fences.insert((3, "east"), (vec!((3, "north")), vec!((3, "south"), (4, "north"), (4, "south"), (8, "east"))));
+        adjacent_fences.insert((4, "east"), (vec!((4, "north")), vec!((4, "south"), (9, "east"))));
+
+        adjacent_fences.insert((5, "north"), (vec!((0, "west"), (5, "west")), vec!((0, "east"), (5, "east"), (6, "north"))));
+        adjacent_fences.insert((6, "north"), (vec!((1, "west"), (6, "west"), (5, "north")), vec!((1, "east"), (6, "east"), (7, "north"))));
+        adjacent_fences.insert((7, "north"), (vec!((2, "west"), (7, "west"), (6, "north")), vec!((2, "east"), (7, "east"), (8, "north"))));
+        adjacent_fences.insert((8, "north"), (vec!((3, "west"), (8, "west"), (7, "north")), vec!((3, "east"), (8, "east"), (9, "north"))));
+        adjacent_fences.insert((9, "north"), (vec!((4, "west"), (8, "north"), (9, "west")), vec!((4, "east"), (9, "east"))));
+
+        adjacent_fences.insert((5, "west"), (vec!((5, "north"), (0, "west")), vec!((5, "south"), (10, "west"))));
+        adjacent_fences.insert((5, "east"), (vec!((5, "north"), (0, "east"), (6, "north")), vec!((5, "south"), (6, "south"), (10, "east"))));
+        adjacent_fences.insert((6, "east"), (vec!((6, "north"), (1, "east"), (7, "north")), vec!((6, "south"), (7, "south"), (11, "east"))));
+        adjacent_fences.insert((7, "east"), (vec!((7, "north"), (2, "east"), (8, "north")), vec!((7, "south"), (8, "south"), (12, "east"))));
+        adjacent_fences.insert((8, "east"), (vec!((8, "north"), (3, "east"), (9, "north")), vec!((8, "south"), (9, "south"), (13, "east"))));
+        adjacent_fences.insert((9, "east"), (vec!((9, "north"), (4, "east")), vec!((9, "south"), (14, "east"))));
+
+        adjacent_fences.insert((10, "north"), (vec!((5, "west"), (10, "west")), vec!((5, "east"), (10, "east"), (11, "north"))));
+        adjacent_fences.insert((11, "north"), (vec!((6, "west"), (11, "west"), (10, "north")), vec!((11, "east"), (6, "east"), (12, "north"))));
+        adjacent_fences.insert((12, "north"), (vec!((7, "west"), (12, "west"), (11, "north")), vec!((12, "east"), (7, "east"), (13, "north"))));
+        adjacent_fences.insert((13, "north"), (vec!((8, "west"), (13, "west"), (12, "north")), vec!((13, "east"), (8, "east"), (14, "north"))));
+        adjacent_fences.insert((14, "north"), (vec!((9, "west"), (14, "west"),  (13, "north")), vec!((14, "east"), (9, "east"))));
+
+        adjacent_fences.insert((10, "west"), (vec!((10, "north"), (5, "west")), vec!((10, "south"))));
+        adjacent_fences.insert((10, "east"), (vec!((10, "north"), (11, "north"), (5, "east")), vec!((10, "south"), (11, "south"))));
+        adjacent_fences.insert((11, "east"), (vec!((11, "north"), (12, "north"), (6, "east")), vec!((11, "south"), (12, "south"))));
+        adjacent_fences.insert((12, "east"), (vec!((12, "north"), (13, "north"), (7, "east")), vec!((12, "south"), (13, "south"))));
+        adjacent_fences.insert((13, "east"), (vec!((13, "north"), (14, "north"), (8, "east")), vec!((13, "south"), (14, "south"))));
+        adjacent_fences.insert((14, "east"), (vec!((14, "north"), (9, "west")), vec!((14, "south"))));
+
+        adjacent_fences.insert((10, "south"), (vec!((10, "west")), vec!((10, "east"), (11, "south"))));
+        adjacent_fences.insert((11, "south"), (vec!((11, "west"), (10, "south")), vec!((11, "east"), (12, "south"))));
+        adjacent_fences.insert((12, "south"), (vec!((12, "west"), (11, "south")), vec!((12, "east"), (13, "south"))));
+        adjacent_fences.insert((13, "south"), (vec!((13, "west"), (12, "south")), vec!((13, "east"), (14, "south"))));
+        adjacent_fences.insert((14, "south"), (vec!((14, "west"), (13, "south")), vec!((14, "east"))));
+        adjacent_fences
+    };
+}
 
 #[derive(Debug, Clone)]
 struct Player {
@@ -30,7 +96,8 @@ struct Player {
     house_type: HouseType,
     beggers: usize,
     children: usize,
-    fences: usize
+    fences: usize,
+    pastures: Vec<Vec<usize>>
 }
 
 impl Player {
@@ -661,7 +728,7 @@ impl State for AgricolaState {
         if self.players[self.current_player].actions == 0 {
             panic!("Oh noes.. attempting to play a piece with no actions. :(");
         }
-        // println!("[R:{} P:{}] Action: {} {:?}", self.rounds, self.current_player, action, AgricolaAction::from_u32(action));
+        println!("[R:{} P:{}] Action: {} {:?}", self.rounds, self.current_player, action, AgricolaAction::from_u32(action));
         let player_index = self.current_player;
         let num_players = self.players.len();
         let mut action_taken = String::from("");
@@ -847,153 +914,128 @@ impl State for AgricolaState {
                 Some(AgricolaAction::Fences_14) |
                 Some(AgricolaAction::Fences_15) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Fences).unwrap());
-                    let mut num_fences = 0;
+                    let mut orig_num_fences = 0;
 
                     match agricola_action {
-                        Some(AgricolaAction::Fences_1) => { num_fences = 1; },
-                        Some(AgricolaAction::Fences_2) => { num_fences = 2; },
-                        Some(AgricolaAction::Fences_3) => { num_fences = 3; },
-                        Some(AgricolaAction::Fences_4) => { num_fences = 4; },
-                        Some(AgricolaAction::Fences_5) => { num_fences = 5; },
-                        Some(AgricolaAction::Fences_6) => { num_fences = 6; },
-                        Some(AgricolaAction::Fences_7) => { num_fences = 7; },
-                        Some(AgricolaAction::Fences_8) => { num_fences = 8; },
-                        Some(AgricolaAction::Fences_9) => { num_fences = 9; },
-                        Some(AgricolaAction::Fences_10) => { num_fences = 10; },
-                        Some(AgricolaAction::Fences_11) => { num_fences = 11; },
-                        Some(AgricolaAction::Fences_12) => { num_fences = 12; },
-                        Some(AgricolaAction::Fences_13) => { num_fences = 13; },
-                        Some(AgricolaAction::Fences_14) => { num_fences = 14; },
-                        Some(AgricolaAction::Fences_15) =>  { num_fences = 15; },
+                        Some(AgricolaAction::Fences_1) => { orig_num_fences = 1; },
+                        Some(AgricolaAction::Fences_2) => { orig_num_fences = 2; },
+                        Some(AgricolaAction::Fences_3) => { orig_num_fences = 3; },
+                        Some(AgricolaAction::Fences_4) => { orig_num_fences = 4; },
+                        Some(AgricolaAction::Fences_5) => { orig_num_fences = 5; },
+                        Some(AgricolaAction::Fences_6) => { orig_num_fences = 6; },
+                        Some(AgricolaAction::Fences_7) => { orig_num_fences = 7; },
+                        Some(AgricolaAction::Fences_8) => { orig_num_fences = 8; },
+                        Some(AgricolaAction::Fences_9) => { orig_num_fences = 9; },
+                        Some(AgricolaAction::Fences_10) => { orig_num_fences = 10; },
+                        Some(AgricolaAction::Fences_11) => { orig_num_fences = 11; },
+                        Some(AgricolaAction::Fences_12) => { orig_num_fences = 12; },
+                        Some(AgricolaAction::Fences_13) => { orig_num_fences = 13; },
+                        Some(AgricolaAction::Fences_14) => { orig_num_fences = 14; },
+                        Some(AgricolaAction::Fences_15) =>  { orig_num_fences = 15; },
                         _ => panic!("No other options for fences"),
                     }
 
-                    if num_fences > player.wood {
-                        num_fences = 0;
+                    if orig_num_fences > player.wood {
+                        orig_num_fences = player.wood;
                     }
 
-                    if num_fences > (15 - player.fences) {
-                        num_fences = 15 - player.fences;
+                    if orig_num_fences > (15 - player.fences) {
+                        orig_num_fences = 15 - player.fences;
                     }
                     
-                    let mut fence_places = Vec::new();
 
-                    loop {
-                        if num_fences == 0 {
-                            break;
-                        }
-                        let mut fence_index = 0;
-                        // No fences yet, random choice
-                        if player.fences == 0 {
-                            fence_index = rand::random::<usize>() % 60;
-                        } else {
-                        // Subsequent fences are placed connected to another fence
-                            let mut current_fences = Vec::new(); 
-                            for (i, tile) in player.player_mat.tiles.iter().enumerate() {
-                                if tile.north_fence {
-                                    current_fences.push((i, "north"));
-                                }
-                                if tile.west_fence {
-                                    current_fences.push((i, "west"));
-                                }
-                                if tile.south_fence {
-                                    current_fences.push((i, "south"));
-                                }
-                                if tile.east_fence {
-                                    current_fences.push((i, "east"));
-                                }
+                    println!("Start_Num fences: {}", orig_num_fences);
+                    let mut i = 0;
+                    let mut fences_worked = false;
+                    for i in 0..3 {
+                        let mut fence_places = Vec::new();
+                        let mut temp_player_mat = player.player_mat.clone();
+                        let mut num_fences = orig_num_fences;
+                        println!("[{:?}] RESET... {}", agricola_action, i);
+
+                        loop {
+                            println!("[player.fences {}] Num fences: {}", player.fences, num_fences);
+
+                            if num_fences == 0 {
+                                break;
                             }
+                            let mut fence_index = 0;
+                            // No fences yet, random choice
+                            if player.fences == 0 {
+                                fence_index = rand::random::<usize>() % 60;
+                            } else {
+                                // Subsequent fences are placed connected to another fence
+                                let current_fences = temp_player_mat.current_fences();
 
-                            let mut adjacent_fences = HashMap::new();
-                            adjacent_fences.insert((0, "north"), vec!((0, "west"), (0, "east"), (1, "north")));
-                            adjacent_fences.insert((1, "north"), vec!((0, "north"), (1, "west"), (1, "east"), (2, "north")));
-                            adjacent_fences.insert((2, "north"), vec!((1, "north"), (2, "west"), (2, "east"), (3, "north")));
-                            adjacent_fences.insert((3, "north"), vec!((2, "north"), (3, "west"), (3, "east"), (4, "north")));
-                            adjacent_fences.insert((4, "north"), vec!((3, "north"), (4, "west"), (4, "east")));
+                                println!("current_fences: {:?}", current_fences);
+                                println!("Player Mat:\n{}", temp_player_mat);
 
-                            adjacent_fences.insert((0, "west"), vec!((0, "north"), (0, "south"), (5, "west")));
-                            adjacent_fences.insert((0, "east"), vec!((0, "north"), (0, "south"), (1, "north"), (1, "south"), (5, "east")));
-                            adjacent_fences.insert((1, "east"), vec!((1, "north"), (1, "south"), (2, "north"), (2, "south"), (6, "east")));
-                            adjacent_fences.insert((2, "east"), vec!((2, "north"), (2, "south"), (3, "north"), (3, "south"), (7, "east")));
-                            adjacent_fences.insert((3, "east"), vec!((3, "north"), (3, "south"), (4, "north"), (4, "south"), (8, "east")));
-                            adjacent_fences.insert((4, "east"), vec!((4, "north"), (4, "south"), (9, "east")));
+                                let mut curr_adjacent_fences = HashSet::new();
 
-                            adjacent_fences.insert((5, "north"), vec!((0, "west"), (0, "east"), (5, "west"), (5, "east"), (6, "north")));
-                            adjacent_fences.insert((6, "north"), vec!((1, "west"), (1, "east"), (6, "west"), (6, "east"), (5, "north"), (7, "north")));
-                            adjacent_fences.insert((7, "north"), vec!((2, "west"), (2, "east"), (7, "west"), (7, "east"), (6, "north"), (8, "north")));
-                            adjacent_fences.insert((8, "north"), vec!((3, "west"), (3, "east"), (8, "west"), (8, "east"), (7, "north"), (9, "north")));
-                            adjacent_fences.insert((9, "north"), vec!((4, "west"), (4, "east"), (9, "west"), (9, "east"), (8, "north")));
+                                for curr_fence in current_fences {
+                                    if let Some(&(ref endpoint_1, ref endpoint_2)) = FENCE_MAP.get(&curr_fence) {
+                                        // TODO: Why do these loops work and not the iters :(
+                                        for x in endpoint_1 {
+                                            curr_adjacent_fences.insert(x);
+                                        }
 
-                            adjacent_fences.insert((5, "west"), vec!((5, "north"), (5, "south"), (0, "west"), (10, "west")));
-                            adjacent_fences.insert((5, "east"), vec!((5, "north"), (5, "south"), (0, "east"), (6, "north"), (6, "south"), (10, "east")));
-                            adjacent_fences.insert((6, "east"), vec!((6, "north"), (6, "south"), (1, "east"), (7, "north"), (7, "south"), (11, "east")));
-                            adjacent_fences.insert((7, "east"), vec!((7, "north"), (7, "south"), (2, "east"), (8, "north"), (8, "south"), (12, "east")));
-                            adjacent_fences.insert((8, "east"), vec!((8, "north"), (8, "south"), (3, "east"), (9, "north"), (9, "south"), (13, "east")));
-                            adjacent_fences.insert((9, "east"), vec!((9, "north"), (9, "south"), (4, "east"), (14, "east")));
-
-                            adjacent_fences.insert((10, "north"), vec!((5, "west"), (5, "east"), (10, "west"), (10, "east"), (11, "north")));
-                            adjacent_fences.insert((11, "north"), vec!((6, "west"), (6, "east"), (11, "west"), (11, "east"), (10, "north"), (12, "north")));
-                            adjacent_fences.insert((12, "north"), vec!((7, "west"), (7, "east"), (12, "west"), (12, "east"), (11, "north"), (13, "north")));
-                            adjacent_fences.insert((13, "north"), vec!((8, "west"), (8, "east"), (13, "west"), (13, "east"), (12, "north"), (14, "north")));
-                            adjacent_fences.insert((14, "north"), vec!((9, "west"), (9, "east"), (14, "west"), (14, "east"), (13, "north")));
-
-                            adjacent_fences.insert((10, "west"), vec!((10, "north"), (10, "south"), (5, "west")));
-                            adjacent_fences.insert((10, "east"), vec!((10, "north"), (10, "south"), (11, "north"), (11, "south"), (5, "east")));
-                            adjacent_fences.insert((11, "east"), vec!((11, "north"), (11, "south"), (12, "north"), (12, "south"), (6, "east")));
-                            adjacent_fences.insert((12, "east"), vec!((12, "north"), (12, "south"), (13, "north"), (13, "south"), (7, "east")));
-                            adjacent_fences.insert((13, "east"), vec!((13, "north"), (13, "south"), (14, "north"), (14, "south"), (8, "east")));
-                            adjacent_fences.insert((14, "east"), vec!((14, "north"), (14, "south"), (9, "west")));
-
-                            adjacent_fences.insert((10, "south"), vec!((10, "west"), (10, "east"), (11, "south")));
-                            adjacent_fences.insert((11, "south"), vec!((11, "west"), (11, "east"), (10, "south"), (12, "south")));
-                            adjacent_fences.insert((12, "south"), vec!((12, "west"), (12, "east"), (11, "south"), (13, "south")));
-                            adjacent_fences.insert((13, "south"), vec!((13, "west"), (13, "east"), (12, "south"), (14, "south")));
-                            adjacent_fences.insert((14, "south"), vec!((14, "west"), (14, "east"), (13, "south")));
-
-                            println!("current_fences: {:?}", current_fences);
-                            println!("{}", player);
-
-                            let mut curr_adjacent_fences = HashSet::new();
-
-                            for curr_fence in current_fences {
-                                if let Some(curr_adjacent) = adjacent_fences.get(&curr_fence) {
-                                    for adj in curr_adjacent {
-                                        curr_adjacent_fences.insert(adj);
+                                        for x in endpoint_2 {
+                                            curr_adjacent_fences.insert(x);
+                                        }
+                                        
+                                        // endpoint_1.iter().map(|x| curr_adjacent_fences.insert(x));
+                                        // endpoint_2.iter().map(|x| curr_adjacent_fences.insert(x));
                                     }
                                 }
+
+                                let mut rng = thread_rng();
+                                let sample = sample(&mut rng, curr_adjacent_fences, 1);
+                                match sample.len() {
+                                    1 => {
+                                        let &(tile_index, direction) = sample[0];
+                                        let tile_index_modifier = match direction {
+                                            "north" => 0,
+                                            "west" => 1,
+                                            "south" => 2,
+                                            "east" => 3,
+                                            _ => panic!("Received a direction for fence that is unknown..")
+                                        };
+                                        fence_index = tile_index * 4 + tile_index_modifier;
+                                        println!("Sample: {:?} fence_index: {:?}", sample, fence_index);
+                                    },
+                                    _ => panic!("Random fence sample failed..")
+                                }
                             }
 
-                            println!("curr_adjacent_fences: {:?}", curr_adjacent_fences);
-
-                            let mut rng = thread_rng();
-                            let sample = sample(&mut rng, curr_adjacent_fences, 1);
-                            match sample.len() {
-                                1 => {
-                                    let &(tile_index, direction) = sample[0];
-                                    let tile_index_modifier = match direction {
-                                        "north" => 0,
-                                        "west" => 1,
-                                        "south" => 2,
-                                        "east" => 3,
-                                        _ => panic!("Received a direction for fence that is unknown..")
-                                    };
-                                    fence_index = tile_index * 4 + tile_index_modifier;
-                                    println!("Sample: {:?} fence_index: {:?}", sample, fence_index);
-                                },
-                                _ => panic!("Random fence sample failed..")
+                            println!("Trying fence index: {}", fence_index);
+                            if let Some(index) = temp_player_mat.place_fence(fence_index) {
+                                num_fences -= 1;
+                                fence_places.push(index.clone());
                             }
                         }
 
-                        println!("Trying fence index: {}", fence_index);
-                        if let Some(index) = player.player_mat.place_fence(fence_index) {
-                            num_fences -= 1;
+                    println!("{}", temp_player_mat.valid_fences());
+                    println!("{}", temp_player_mat);
+                    println!("Fence Places: {:?}", fence_places);
+
+                    if fence_places.len() == 0 {
+                        continue;
+                    } 
+                    if temp_player_mat.valid_fences() == true {
+                        action_taken = format!("{:?} +{} {:?}", agricola_action, fence_places.len(), fence_places).to_string();
+
+                        for fence_place in fence_places {
                             player.wood -= 1;
                             player.fences += 1;
-                            fence_places.push(index.clone());
+                            player.player_mat.place_fence(fence_place);
                         }
-                    }
 
-                    action_taken = format!("{:?} +{} {:?}", agricola_action, fence_places.len(), fence_places).to_string();
+                        println!("FOUND FOUND FOUND!!!");
+                        println!("Player:\n{}", player);
+                        fences_worked = true;
+                        break;
+                    }
+                }
                 },
                 Some(AgricolaAction::FamilyGrowth) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth).unwrap());
@@ -1142,8 +1184,8 @@ impl State for AgricolaState {
             player.actions -= 1;
             self.player_just_moved = self.current_player;
         }
-        self.add_action(player_index, action_taken);
 
+        self.add_action(player_index, action_taken);
 
         /*
         * Since players can have different number of actions, we need to loop through
@@ -1413,7 +1455,7 @@ impl PlayerMat {
 
     /// Given a number, place a fence at that location for both tiles touching that fence location
     /// Returns: True, placed fence; False, already occupied
-    pub fn place_fence(&mut self, x: usize) -> Option<String> {
+    pub fn place_fence(&mut self, x: usize) -> Option<usize> {
         let tile_index = x / 4;
         let position = x % 4;
         match position {
@@ -1579,6 +1621,7 @@ impl PlayerMat {
             _ => panic!("Should never reach here!")
         };
 
+        /*
         let string_index = match position {
             0 => format!("{}-{}N", x, tile_index),
             1 => format!("{}-{}W", x, tile_index),
@@ -1586,8 +1629,9 @@ impl PlayerMat {
             3 => format!("{}-{}E", x, tile_index),
             _ => panic!("No other valid fence position")
         };
+        */
 
-        return Some(string_index);
+        return Some(tile_index);
     }
 
     fn plow_random_field(&mut self) {
@@ -1610,6 +1654,52 @@ impl PlayerMat {
         }
         let random_field = rand::thread_rng().choose(&possible_fields).unwrap();
         self.tiles[*random_field].plow();
+    }
+
+    fn current_fences(&self) -> Vec<(usize, &str)> {
+        let mut current_fences = Vec::new(); 
+        // for (i, tile) in player.player_mat.tiles.iter().enumerate() {
+        for (i, tile) in self.tiles.iter().enumerate() {
+            if tile.north_fence {
+                current_fences.push((i, "north"));
+            }
+            if tile.west_fence {
+                current_fences.push((i, "west"));
+            }
+            if tile.south_fence {
+                current_fences.push((i, "south"));
+            }
+            if tile.east_fence {
+                current_fences.push((i, "east"));
+            }
+        }
+        current_fences
+    }
+
+
+    fn valid_fences(&self) -> bool {
+        let current_fences = self.current_fences();
+
+        for curr_fence in current_fences.iter() {
+            if let Some(&(ref endpoint_1, ref endpoint_2)) = FENCE_MAP.get(&curr_fence) {
+                let mut found_fences = Vec::new();
+                for fence in endpoint_1 {
+                    if current_fences.contains(&fence) {
+                        found_fences.push(fence);
+                    }
+                }
+
+                for fence in endpoint_2 {
+                    if current_fences.contains(&fence) {
+                        found_fences.push(fence);
+                    }
+                }
+                if found_fences.len() == 2 {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
