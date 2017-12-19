@@ -121,7 +121,8 @@ impl Player {
             house_type: HouseType::Wood,
             beggers: 0,
             children: 0,
-            fences: 0
+            fences: 0,
+            pastures: Vec::new()
         }
     }
 
@@ -352,6 +353,44 @@ impl Player {
             HouseType::Wood => self.house_type = HouseType::Clay,
             HouseType::Clay => self.house_type = HouseType::Stone,
             HouseType::Stone => {}
+        }
+    }
+
+    fn make_pastures(&mut self) {
+        let mut curr_pasture = HashSet::new();
+
+        {
+            let empty_spaces: Vec<&FarmTile> = self.player_mat.tiles.iter()
+                                                                    .filter(|&t| t.can_be_fenced())
+                                                                    .collect(); 
+                
+
+            if let Some(temp_space) = rand::thread_rng().choose(&empty_spaces) {
+                let mut curr_space = *temp_space;
+                curr_pasture.insert(curr_space.index);
+                loop {
+                    if rand::random::<usize>() % 100 < 30 {
+                        break;
+                    }
+                    
+                    let surrounding_tiles: Vec<&usize> = curr_space.surrounding_tiles.iter()
+                                                                                    .filter(|&t| self.player_mat.tiles[*t].can_be_fenced())
+                                                                                    .collect();
+
+                    if let Some(surrounding_tile) = rand::thread_rng().choose(&surrounding_tiles) {
+                        curr_space = &self.player_mat.tiles[**surrounding_tile];
+                        curr_pasture.insert(**surrounding_tile);
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                println!("[Make Pastures] No more empty spaces.. cannot make pasture");
+            }
+        }
+
+        if curr_pasture.len() > 0 {
+            self.player_mat.make_pasture(curr_pasture.into_iter().collect(), self.wood);
         }
     }
 }
@@ -944,10 +983,15 @@ impl State for AgricolaState {
                     }
                     
 
-                    println!("Start_Num fences: {}", orig_num_fences);
+                    // println!("Start_Num fences: {}", orig_num_fences);
                     let mut i = 0;
                     let mut fences_worked = false;
-                    for i in 0..3 {
+
+                    player.make_pastures();
+
+                    /*
+
+
                         let mut fence_places = Vec::new();
                         let mut temp_player_mat = player.player_mat.clone();
                         let mut num_fences = orig_num_fences;
@@ -1035,7 +1079,8 @@ impl State for AgricolaState {
                         fences_worked = true;
                         break;
                     }
-                }
+                    */
+                
                 },
                 Some(AgricolaAction::FamilyGrowth) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth).unwrap());
@@ -1423,7 +1468,7 @@ impl PlayerMat {
     pub fn new() -> PlayerMat {
         let mut player_mat = Vec::new();
         for i in 0..15 {
-            let mut new_tile = FarmTile::new();
+            let mut new_tile = FarmTile::new(i);
             match i {
                 5|10 => {
                     new_tile.house = Some(HouseType::Wood);
@@ -1658,7 +1703,6 @@ impl PlayerMat {
 
     fn current_fences(&self) -> Vec<(usize, &str)> {
         let mut current_fences = Vec::new(); 
-        // for (i, tile) in player.player_mat.tiles.iter().enumerate() {
         for (i, tile) in self.tiles.iter().enumerate() {
             if tile.north_fence {
                 current_fences.push((i, "north"));
@@ -1677,6 +1721,7 @@ impl PlayerMat {
     }
 
 
+    /*
     fn valid_fences(&self) -> bool {
         let current_fences = self.current_fences();
 
@@ -1701,6 +1746,132 @@ impl PlayerMat {
         }
         false
     }
+    */
+
+    fn make_pasture(&mut self, curr_pasture: Vec<usize>, available_wood: usize) -> Option<usize> {
+        let test_pasture = curr_pasture.clone();
+        println!("Before pasture: {:?}", curr_pasture);
+        println!("{}", self);
+
+        // Calculate how much wood is necessary to build the pasture before actually setting it
+        let mut wood_needed = 0;
+        for tile_index in &test_pasture {
+            if wood_needed > available_wood {
+                println!("Not enough wood for pasture..");
+                return None;
+            }
+
+            {
+                let curr_tile = &mut self.tiles[*tile_index];
+                if !curr_tile.can_be_fenced() {
+                    panic!("Make pasture tile is currently occupied");
+                    return None;
+                }
+            }
+
+            match tile_index {
+                &4|&9|&14 => { 
+                    if !self.tiles[*tile_index].west_fence {
+                        wood_needed += 1; 
+                    }
+                },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index+1)) && !self.tiles[*tile_index].west_fence {
+                        wood_needed += 1;
+                    }
+                }
+            }
+            match tile_index {
+                &0|&5|&10 => { 
+                    if !self.tiles[*tile_index].east_fence {
+                        wood_needed += 1; 
+                    }
+                },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index-1)) && !self.tiles[*tile_index].east_fence {
+                        wood_needed += 1;
+                    }
+                }
+            }
+            match tile_index {
+                &0|&1|&2|&3|&4 => { 
+                    if !self.tiles[*tile_index].north_fence {
+                        wood_needed += 1; 
+                    }
+                },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index-5)) && !self.tiles[*tile_index].north_fence {
+                        wood_needed += 1;
+                    }
+                }
+            }
+            match tile_index {
+                &10|&11|&12|&13|&14 => { 
+                    if !self.tiles[*tile_index].south_fence {
+                        wood_needed += 1; 
+                    }
+                },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index+5)) && !self.tiles[*tile_index].south_fence {
+                        wood_needed += 1;
+                    }
+                }
+            }
+        }
+        
+        // We have enough wood to make the pasture work.. actually set the pasture now.
+        for tile_index in test_pasture {
+            {
+                let curr_tile = &mut self.tiles[tile_index];
+                if !curr_tile.can_be_fenced() {
+                    panic!("Make pasture tile is currently occupied");
+                }
+                curr_tile.pasture = true;
+            }
+
+            // let curr_tile = &mut self.tiles[tile_index];
+            match tile_index {
+                4|9|14 => { self.tiles[tile_index].east_fence = true },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index+1)) {
+                        self.tiles[tile_index].east_fence = true;
+                        self.tiles[tile_index+1].west_fence = true;
+                    }
+                }
+            }
+            match tile_index {
+                0|5|10 => { self.tiles[tile_index].west_fence = true },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index-1)) {
+                        self.tiles[tile_index].west_fence = true;
+                        self.tiles[tile_index-1].east_fence = true;
+                    }
+                }
+            }
+            match tile_index {
+                0..5 => { self.tiles[tile_index].north_fence = true },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index-5)) {
+                        self.tiles[tile_index].north_fence = true;
+                        self.tiles[tile_index-5].south_fence = true;
+                    }
+                }
+            }
+            match tile_index {
+                10..15 => { self.tiles[tile_index].south_fence = true },
+                _ => { 
+                    if !curr_pasture.contains(&(tile_index+5)) {
+                        self.tiles[tile_index].south_fence = true;
+                        self.tiles[tile_index+5].north_fence = true;
+                    }
+                }
+            }
+        }
+        println!("[Wood: {}] After pasture: {:?}", wood_needed, curr_pasture);
+        println!("{}", self);
+        Some(wood_needed)
+    }
+
 }
 
 impl Display for PlayerMat {
@@ -1831,6 +2002,7 @@ impl Display for PlayerMat {
 struct FarmTile {
     house: Option<HouseType>,
     stable: bool,
+    pasture: bool,
     animal_type: Option<Animal>,
     animal_count: usize,
     north_fence: bool,
@@ -1838,14 +2010,16 @@ struct FarmTile {
     east_fence: bool,
     west_fence: bool,
     field: Option<FieldTile>,
-    surrounding_tiles: Vec<usize>
+    surrounding_tiles: Vec<usize>,
+    index: usize
 }
 
 impl FarmTile {
-    fn new() -> FarmTile {
+    fn new(index: usize) -> FarmTile {
         FarmTile {
             house: None,
             stable: false,
+            pasture: false,
             animal_type: None,
             animal_count: 0,
             north_fence: false,
@@ -1853,12 +2027,17 @@ impl FarmTile {
             east_fence: false,
             west_fence: false,
             field: None,
-            surrounding_tiles: Vec::new()
+            surrounding_tiles: Vec::new(),
+            index: index
         }
     }
-
+    
     fn is_empty(&self) -> bool {
-        self.house.is_none() && !self.stable && self.field.is_none()
+        self.house.is_none() && !self.stable && self.field.is_none() && !self.pasture
+    }
+
+    fn can_be_fenced(&self) -> bool {
+        self.house.is_none() && self.field.is_none() && !self.pasture
     }
 
     fn plow(&mut self) {
