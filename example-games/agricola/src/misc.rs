@@ -102,7 +102,7 @@ impl Display for Animal {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Crop {
     Grain,
     Vegetable

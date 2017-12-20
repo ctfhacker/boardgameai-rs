@@ -39,4 +39,18 @@ impl FieldTile {
             Some(ref field) => true
         }
     }
+
+    pub fn is_vegetable(&self) -> bool {
+        if let Some(ref crop) = self.crop {
+            return crop == &Crop::Vegetable;
+        }
+        false
+    }
+
+    pub fn is_grain(&self) -> bool {
+        if let Some(ref crop) = self.crop {
+            return crop == &Crop::Grain;
+        }
+        false
+    }
 }

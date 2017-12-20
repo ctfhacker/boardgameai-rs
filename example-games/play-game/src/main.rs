@@ -161,11 +161,11 @@ fn main() {
         let mut iterations = 0;
         if state.current_player == 0 {
             // First player is "dumb" with less iterations
-            iterations = 5001;
+            iterations = 10001;
             best_action = UCT(arena, state.clone(), iterations);
         } else {
             // "smart" players
-            iterations = 5002;
+            iterations = 1002;
             best_action = UCT(arena, state.clone(), iterations);
         }
 

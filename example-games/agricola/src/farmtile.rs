@@ -37,7 +37,7 @@ impl FarmTile {
     pub fn is_empty(&self) -> bool {
         self.house.is_none() && self.field.is_none() && !self.pasture && !self.stable 
     }
-
+t
     pub fn can_be_fenced(&self) -> bool {
         self.house.is_none() && self.field.is_none() && !self.pasture
     }

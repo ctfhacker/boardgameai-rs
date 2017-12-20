@@ -77,9 +77,10 @@ impl Player {
         if verbose { println!("Pastures: {} -> {} pts", self.pastures.len(), self.pastures.len()); }
 
         let grain_in_fields: usize = self.player_mat.tiles.iter()
-                                            .filter(|t| t.field.is_some())
-                                            .map(|t| t.clone().field.unwrap().count)
-                                            .sum();
+                                                          .filter_map(|t| t.field.clone())
+                                                          .filter(|t| t.is_grain())
+                                                          .map(|t| t.count)
+                                                          .sum();
 
         match (self.grains + grain_in_fields) {
             0     => score = -1,
@@ -89,9 +90,15 @@ impl Player {
             _     => score = 4,
         };
         result += score;
-        if verbose { println!("Grains: {} -> {} pts", self.grains+grain_in_fields, score); }
+        if verbose { println!("Grains: {} (in hand) + {} (in fields) -> {} pts", self.grains, grain_in_fields, score); }
 
-        match self.vegetables {
+        let veg_in_fields: usize = self.player_mat.tiles.iter()
+                                                        .filter_map(|t| t.field.clone())
+                                                        .filter(|t| t.is_vegetable())
+                                                        .map(|t| t.count)
+                                                        .sum();
+
+        match (self.vegetables + veg_in_fields) {
             0 => score = -1,
             1 => score = 1,
             2 => score = 2,
@@ -99,7 +106,7 @@ impl Player {
             _ => score = 4,
         };
         result += score;
-        if verbose { println!("Veg: {} -> {} pts", self.vegetables, score); }
+        if verbose { println!("Vegetables: {} (in hand) + {} (in fields) -> {} pts", self.vegetables, veg_in_fields, score); }
 
         match self.sheep {
             0     => score = -1,
