@@ -21,6 +21,7 @@ pub mod agricolaaction;
 pub mod agricolastate;
 pub mod board;
 pub mod misc;
+pub mod majorimprovement;
 
 pub use player::*;
 pub use playermat::*;
@@ -32,3 +33,4 @@ pub use agricolastate::*;
 pub use board::*;
 pub use misc::*;
 pub use pasture::*;
+pub use majorimprovement::*;

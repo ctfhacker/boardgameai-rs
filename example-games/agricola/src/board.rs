@@ -10,8 +10,6 @@ pub struct BoardTile {
     pub reset_amount: usize
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct Board {
     pub tiles: HashMap<AgricolaTile, Box<BoardTile>>,
@@ -23,15 +21,15 @@ impl Board {
         let mut future_tiles = Vec::new();
 
         let round_1_tiles = vec!(
-            (AgricolaTile::Sow_BakeBread, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
             (AgricolaTile::Fences, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
-            (AgricolaTile::MajorImprovement, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
             (AgricolaTile::Sheep, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+            (AgricolaTile::Sow_BakeBread, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
+            (AgricolaTile::MajorImprovement, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
         );
 
         let round_2_tiles = vec!(
-            (AgricolaTile::FamilyGrowth, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
             (AgricolaTile::Stone_1, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1})),
+            (AgricolaTile::FamilyGrowth, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
             (AgricolaTile::Renovation_MajorImprovement, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
         );
 
@@ -85,6 +83,7 @@ impl Board {
         }
     }
 
+    /// Add more counters to the board and add the next action card to the board
     pub fn reset(&mut self) {
         for (name, mut tile) in &mut self.tiles {
             // println!("{:?}: {:?} -> {:?}", name, tile.items, tile.items+tile.reset_amount);

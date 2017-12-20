@@ -1,6 +1,7 @@
 use super::*;
 use std::fmt::Display;
 use std::fmt;
+use rand::Rng;
 
 #[derive(Debug, Clone)]
 pub struct AgricolaState {
@@ -11,7 +12,10 @@ pub struct AgricolaState {
     pub board: Board,
     pub rounds: usize,
     pub total_rounds: usize,
-    pub actions_taken: Vec<String>
+    pub actions_taken: Vec<String>,
+    pub available_improvements: Vec<MajorImprovement>,
+    well_player: Option<usize>,
+    well_food: usize
 }
 
 impl State for AgricolaState {
@@ -57,11 +61,70 @@ impl State for AgricolaState {
                     &AgricolaTile::Fences  => {
                         actions.push(AgricolaAction::Fences as u32);
                     },
-                    &AgricolaTile::MajorImprovement  => actions.push(AgricolaAction::MajorImprovement as u32),
+                    &AgricolaTile::MajorImprovement  => {
+                        if self.available_improvements.contains(&MajorImprovement::Fireplace_2) {
+                            actions.push(AgricolaAction::MajorImprovement_Fireplace_2 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Fireplace_3) {
+                            actions.push(AgricolaAction::MajorImprovement_Fireplace_3 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::CookingHearth_4) {
+                            actions.push(AgricolaAction::MajorImprovement_CookingHearth_4 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::CookingHearth_5) {
+                            actions.push(AgricolaAction::MajorImprovement_CookingHearth_5 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::ClayOven) {
+                            actions.push(AgricolaAction::MajorImprovement_ClayOven as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::StoneOven) {
+                            actions.push(AgricolaAction::MajorImprovement_StoneOven as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Pottery) {
+                            actions.push(AgricolaAction::MajorImprovement_Pottery as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Joinery) {
+                            actions.push(AgricolaAction::MajorImprovement_Joinery as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::BasketmakersWorkshop) {
+                            actions.push(AgricolaAction::MajorImprovement_BasketmakersWorkshop as u32);
+                        }
+                    },
                     &AgricolaTile::Sheep  => actions.push(AgricolaAction::Sheep as u32),
                     &AgricolaTile::FamilyGrowth  => actions.push(AgricolaAction::FamilyGrowth as u32),
                     &AgricolaTile::Stone_1  => actions.push(AgricolaAction::Stone_1 as u32),
-                    &AgricolaTile::Renovation_MajorImprovement  => actions.push(AgricolaAction::Renovation_MajorImprovement as u32),
+                    &AgricolaTile::Renovation_MajorImprovement  => {
+                        if self.available_improvements.contains(&MajorImprovement::Fireplace_2) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_Fireplace_2 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Fireplace_3) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_Fireplace_3 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::CookingHearth_4) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_CookingHearth_4 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::CookingHearth_5) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_CookingHearth_5 as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::ClayOven) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_ClayOven as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::StoneOven) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_StoneOven as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Pottery) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_Pottery as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Joinery) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_Joinery as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::BasketmakersWorkshop) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_BasketmakersWorkshop as u32);
+                        }
+                        if self.available_improvements.contains(&MajorImprovement::Well) {
+                            actions.push(AgricolaAction::Renovation_MajorImprovement_Well as u32);
+                        }
+                    },
                     &AgricolaTile::Vegetable  => actions.push(AgricolaAction::Vegetable as u32),
                     &AgricolaTile::Boar  => actions.push(AgricolaAction::Boar as u32),
                     &AgricolaTile::Cattle  => actions.push(AgricolaAction::Cattle as u32),
@@ -182,17 +245,20 @@ impl State for AgricolaState {
                 Some(AgricolaAction::BakeBread_NotSow) |
                 Some(AgricolaAction::Sow_BakeBread) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Sow_BakeBread).unwrap());
+                    // TODO Bake Bread
                     match agricola_action {
                         Some(AgricolaAction::Sow) => {
                             player.sow();
                             action_taken = format!("Sow").to_string();
                         },
                         Some(AgricolaAction::BakeBread_NotSow) => {
-                            action_taken = format!("Bake Bread and not Sow").to_string();
+                            let food = player.bake_bread();
+                            action_taken = format!("Bake Bread (+{}) and not Sow", food).to_string();
                         },
                         Some(AgricolaAction::Sow_BakeBread) =>  {
                             player.sow();
-                            action_taken = format!("Sow and Bake Bread").to_string();
+                            let food = player.bake_bread();
+                            action_taken = format!("Sow and Bake Bread (+{})", food).to_string();
                         },
                         _ => panic!("Should never get here.. Sow and Bake Bread only had 3 choices..")
                     }
@@ -231,24 +297,26 @@ impl State for AgricolaState {
                 Some(AgricolaAction::Plow) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
                     player.plow();
-                    player.fields += 1;
                     action_taken = format!("Plow").to_string();
                 },
                 Some(AgricolaAction::BuildStable) |
                 Some(AgricolaAction::BakeBread_NoStable) |
                 Some(AgricolaAction::BuildStable_BakeBread) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::BuildStable_BakeBread).unwrap());
+                    // TODO Bake Bread
                     match agricola_action {
                         Some(AgricolaAction::BuildStable) => {
                             player.build_stable();
                             action_taken = format!("Build 1 stable").to_string();
                         }
                         Some(AgricolaAction::BakeBread_NoStable) => {
-                            action_taken = format!("Bake Bread").to_string();
+                            let food = player.bake_bread();
+                            action_taken = format!("Bake Bread (+{})", food).to_string();
                         }
                         Some(AgricolaAction::BuildStable_BakeBread) => {
                             player.build_stable();
-                            action_taken = format!("Build Stable and Bake Bread").to_string();
+                            let food = player.bake_bread();
+                            action_taken = format!("Build Stable and Bake Bread (+{})", food).to_string();
                         },
                         _ => panic!("[BuildStable_BakeBread] Can never reach here..")
                     }
@@ -259,12 +327,242 @@ impl State for AgricolaState {
                         panic!("Player {} is bad.. sheep is already taken", player_index);
                     }
                     player.sheep += curr_tile.items;
+                    player.place_animals();
                     action_taken = format!("Sheep +{}", curr_tile.items).to_string();
                     curr_tile.items = 0;
                 },
-                Some(AgricolaAction::MajorImprovement) => {
+                Some(AgricolaAction::MajorImprovement_Fireplace_2) |
+                Some(AgricolaAction::MajorImprovement_Fireplace_3) |
+                Some(AgricolaAction::MajorImprovement_CookingHearth_4) |
+                Some(AgricolaAction::MajorImprovement_CookingHearth_5) | 
+                Some(AgricolaAction::MajorImprovement_ClayOven) | 
+                Some(AgricolaAction::MajorImprovement_StoneOven) |
+                Some(AgricolaAction::MajorImprovement_Pottery) |
+                Some(AgricolaAction::MajorImprovement_Joinery) |
+                Some(AgricolaAction::MajorImprovement_BasketmakersWorkshop) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::MajorImprovement).unwrap());
-                    action_taken = format!("Major Improvement").to_string();
+
+                    match agricola_action {
+                        Some(AgricolaAction::MajorImprovement_Fireplace_2) => {
+                            if player.clay >= 2 && self.available_improvements.contains(&MajorImprovement::Fireplace_2) {
+                                player.clay -= 2;
+                                player.improvements.push(MajorImprovement::Fireplace_2);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Fireplace_2 isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement +Fireplace (2)").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_Fireplace_3) => {
+                            if player.clay >= 3 && self.available_improvements.contains(&MajorImprovement::Fireplace_3) {
+                                player.clay -= 3;
+                                player.improvements.push(MajorImprovement::Fireplace_3);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Fireplace_3 isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement +Fireplace (3)").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_CookingHearth_4) => {
+                            let mut action = None;
+
+                            if player.clay >= 4 && (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                                    self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                let coin_toss = ::rand::random::<usize>() % 2; 
+                                match coin_toss {
+                                    0 => { action = Some("pay")},
+                                    1 => { action = Some("exchange")},
+                                    _ => panic!("No other coin toss outcome..?!")
+                                }
+                            } else if player.clay >= 4 {
+                                action = Some("pay");
+                            } else if (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                       self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                action = Some("exchange");
+                            }
+
+                            match action {
+                                Some("pay") => {
+                                    player.improvements.push(MajorImprovement::CookingHearth_4);
+                                    if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                        self.available_improvements.remove(index);
+                                        player.clay -= 4; 
+                                    } else {
+                                        // Cooking Hearth 4 is already taken
+                                    }
+                                    action_taken = format!("Major Improvement +Cooking Hearth (4) (Pay)").to_string();
+                                },
+                                Some("exchange") => {
+                                    if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_3);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_4);
+                                        } else {
+                                            // Cooking Hearth 4 is already taken
+                                        }
+                                    } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_2);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_4);
+                                        } else {
+                                            // Cooking Hearth 4 is already taken
+                                        }
+                                    }
+                                    action_taken = format!("Major Improvement +Cooking Hearth (4) (Exchange)").to_string();
+                                },
+                                _ => {} // Cannot pay or exchange for Cooking Hearth 4
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_CookingHearth_5) => {
+                            let mut action = None;
+
+                            if player.clay >= 5 && (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                                    self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                let coin_toss = ::rand::random::<usize>() % 2; 
+                                match coin_toss {
+                                    0 => { action = Some("pay")},
+                                    1 => { action = Some("exchange")},
+                                    _ => panic!("No other coin toss outcome..?!")
+                                }
+                            } else if player.clay >= 5 {
+                                action = Some("pay");
+                            } else if (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                       self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                action = Some("exchange");
+                            }
+
+                            match action {
+                                Some("pay") => {
+                                    player.improvements.push(MajorImprovement::CookingHearth_5);
+                                    if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                        player.clay -= 5; 
+                                        self.available_improvements.remove(index);
+                                    } else {
+                                        // Cooking Hearth 5 is already taken
+                                    }
+                                    action_taken = format!("Major Improvement +Cooking Hearth (5) (Pay)").to_string();
+                                },
+                                Some("exchange") => {
+                                    if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_3);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_5);
+                                        } else {
+                                            // Cooking Hearth 5 is already taken
+                                        }
+                                    } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_2);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_5);
+                                        } else {
+                                            // Cooking Hearth 5 is already taken
+                                        }
+                                    }
+                                    action_taken = format!("Major Improvement +Cooking Hearth (5) (Exchange)").to_string();
+                                },
+                                _ => {} // Cannot pay or exchange for Cooking Hearth 5
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_ClayOven) => {
+                            if player.clay >= 3 && player.stone >= 1 && self.available_improvements.contains(&MajorImprovement::ClayOven) {
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::ClayOven) {
+                                    self.available_improvements.remove(index);
+                                    player.clay -= 3;
+                                    player.stone -= 1;
+                                    player.improvements.push(MajorImprovement::ClayOven);
+                                    player.bake_bread();
+                                } else {
+                                    // Clay Oven taken
+                                    // panic!("No idea why this ClayOven isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - Clay Oven").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_StoneOven) => {
+                            if player.clay >= 1 && player.stone >= 3 && self.available_improvements.contains(&MajorImprovement::StoneOven) {
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::StoneOven) {
+                                    self.available_improvements.remove(index);
+                                    player.clay -= 1;
+                                    player.stone -= 3;
+                                    player.improvements.push(MajorImprovement::StoneOven);
+                                    player.bake_bread();
+                                } else {
+                                    // Stone Oven taken
+                                    // panic!("No idea why this StoneOven isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - Stone Oven").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_Pottery) => {
+                            if player.clay >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::Pottery) {
+                                player.clay -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::Pottery);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Pottery) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Pottery isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - Pottery").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_Joinery) => {
+                            if player.wood >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::Joinery) {
+                                player.wood -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::Joinery);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Joinery) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Joinery isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - Joinery").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_BasketmakersWorkshop) => {
+                            if player.reed >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::BasketmakersWorkshop) {
+                                player.reed -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::BasketmakersWorkshop);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::BasketmakersWorkshop) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this BasketmakersWorkshop isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - BasketmakersWorkshop").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::MajorImprovement_Well) => {
+                            if player.wood >= 1 && player.stone >= 3 && self.available_improvements.contains(&MajorImprovement::Well) {
+                                player.wood -= 1;
+                                player.stone -= 3;
+                                player.improvements.push(MajorImprovement::Well);
+                                self.well_player = Some(self.current_player);
+                                self.well_food = 5;
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Well) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Well isn't in the major improvement list");
+                                }
+                                action_taken = format!("Major Improvement - Well").to_string();
+                            }
+                        },
+                        _ => panic!("No other actions available for major improvements..")
+                    }
+                    action_taken = format!("Major Improvement +{:?}", agricola_action).to_string();
+
                 },
                 Some(AgricolaAction::Fences) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Fences).unwrap());
@@ -291,7 +589,16 @@ impl State for AgricolaState {
                     action_taken = format!("(First) Stone +{}", curr_tile.items).to_string();
                     curr_tile.items = 0;
                 },
-                Some(AgricolaAction::Renovation_MajorImprovement) => {
+                Some(AgricolaAction::Renovation_MajorImprovement_Fireplace_2) |
+                Some(AgricolaAction::Renovation_MajorImprovement_Fireplace_3) |
+                Some(AgricolaAction::Renovation_MajorImprovement_CookingHearth_4) |
+                Some(AgricolaAction::Renovation_MajorImprovement_CookingHearth_5) |
+                Some(AgricolaAction::Renovation_MajorImprovement_ClayOven) |
+                Some(AgricolaAction::Renovation_MajorImprovement_StoneOven) |
+                Some(AgricolaAction::Renovation_MajorImprovement_Pottery) |
+                Some(AgricolaAction::Renovation_MajorImprovement_Joinery) |
+                Some(AgricolaAction::Renovation_MajorImprovement_BasketmakersWorkshop) |
+                Some(AgricolaAction::Renovation_MajorImprovement_Well) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Renovation_MajorImprovement).unwrap());
 
                     let num_rooms = player.player_mat.tiles.iter()
@@ -317,7 +624,227 @@ impl State for AgricolaState {
                         HouseType::Stone => {}
                     }
 
-                    action_taken = format!("Renovation and MajorImprovement").to_string();
+                    match agricola_action {
+                        Some(AgricolaAction::Renovation_MajorImprovement_Fireplace_2) => {
+                            if player.clay >= 2 && self.available_improvements.contains(&MajorImprovement::Fireplace_2) {
+                                player.clay -= 2;
+                                player.improvements.push(MajorImprovement::Fireplace_2);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Fireplace_2 isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement +Fireplace (2)").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_Fireplace_3) => {
+                            if player.clay >= 3 && self.available_improvements.contains(&MajorImprovement::Fireplace_3) {
+                                player.clay -= 3;
+                                player.improvements.push(MajorImprovement::Fireplace_3);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Fireplace_3 isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement +Fireplace (3)").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_CookingHearth_4) => {
+                            let mut action = None;
+
+                            if player.clay >= 4 && (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                                    self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                let coin_toss = ::rand::random::<usize>() % 2; 
+                                match coin_toss {
+                                    0 => { action = Some("pay")},
+                                    1 => { action = Some("exchange")},
+                                    _ => panic!("No other coin toss outcome..?!")
+                                }
+                            } else if player.clay >= 4 {
+                                action = Some("pay");
+                            } else if (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                       self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                action = Some("exchange");
+                            }
+
+                            match action {
+                                Some("pay") => {
+                                    player.improvements.push(MajorImprovement::CookingHearth_4);
+                                    if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                        player.clay -= 4; 
+                                        self.available_improvements.remove(index);
+                                    } else {
+                                        // Cooking Hearth 4 already taken
+                                    }
+                                    action_taken = format!("Renovation and Major Improvement +Cooking Hearth (4) (Pay)").to_string();
+                                },
+                                Some("exchange") => {
+                                    if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_3);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_4);
+                                        } else {
+                                            // Cooking Hearth 4 is already taken
+                                        }
+                                    } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_2);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_4);
+                                        } else {
+                                            // Cooking Hearth 4 is already taken
+                                        }
+                                    }
+                                    action_taken = format!("Renovation and Major Improvement +Cooking Hearth (4) (Exchange)").to_string();
+                                },
+                                _ => {} // Cannot pay or exchange for Cooking Hearth 4
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_CookingHearth_5) => {
+                            let mut action = None;
+
+                            if player.clay >= 5 && (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                                    self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                let coin_toss = ::rand::random::<usize>() % 2; 
+                                match coin_toss {
+                                    0 => { action = Some("pay")},
+                                    1 => { action = Some("exchange")},
+                                    _ => panic!("No other coin toss outcome..?!")
+                                }
+                            } else if player.clay >= 5 {
+                                action = Some("pay");
+                            } else if (self.available_improvements.contains(&MajorImprovement::Fireplace_2) || 
+                                       self.available_improvements.contains(&MajorImprovement::Fireplace_3)) {
+                                action = Some("exchange");
+                            }
+
+                            match action {
+                                Some("pay") => {
+                                    player.clay -= 5; 
+                                    player.improvements.push(MajorImprovement::CookingHearth_5);
+                                    if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                        self.available_improvements.remove(index);
+                                    } else {
+                                        // Cooking Hearth 5 already taken
+                                    }
+                                    action_taken = format!("Renovation and Major Improvement +Cooking Hearth (5) (Pay)").to_string();
+                                },
+                                Some("exchange") => {
+                                    if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_3);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_5);
+                                        } else {
+                                            // Cooking Hearth 5 is already taken
+                                        }
+                                    } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
+                                        if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
+                                            self.available_improvements.remove(cookinghearth_index);
+                                            self.available_improvements.push(MajorImprovement::Fireplace_2);
+                                            player.improvements.remove(fireplace_index);
+                                            player.improvements.push(MajorImprovement::CookingHearth_5);
+                                        } else {
+                                            // Cooking Hearth 5 is already taken
+                                        }
+                                    }
+                                    action_taken = format!("Renovation and Major Improvement +Cooking Hearth (5) (Exchange)").to_string();
+                                },
+                                _ => {} // Cannot pay or exchange for Cooking Hearth 5
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_ClayOven) => {
+                            if player.clay >= 3 && player.stone >= 1 && self.available_improvements.contains(&MajorImprovement::ClayOven) {
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::ClayOven) {
+                                    self.available_improvements.remove(index);
+                                    player.clay -= 3;
+                                    player.stone -= 1;
+                                    player.improvements.push(MajorImprovement::ClayOven);
+                                    player.bake_bread();
+                                } else {
+                                    // Clay Oven taken
+                                    // panic!("No idea why this ClayOven isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - Clay Oven").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_StoneOven) => {
+                            if player.clay >= 1 && player.stone >= 3 && self.available_improvements.contains(&MajorImprovement::StoneOven) {
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::StoneOven) {
+                                    self.available_improvements.remove(index);
+                                    player.clay -= 1;
+                                    player.stone -= 3;
+                                    player.improvements.push(MajorImprovement::StoneOven);
+                                    player.bake_bread();
+                                } else {
+                                    // Stone Oven taken
+                                    // panic!("No idea why this StoneOven isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - Stone Oven").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_Pottery) => {
+                            if player.clay >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::Pottery) {
+                                player.clay -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::Pottery);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Pottery) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Pottery isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - Pottery").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_Joinery) => {
+                            if player.wood >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::Joinery) {
+                                player.wood -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::Joinery);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Joinery) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Joinery isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - Joinery").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_BasketmakersWorkshop) => {
+                            if player.reed >= 2 && player.stone >= 2 && self.available_improvements.contains(&MajorImprovement::BasketmakersWorkshop) {
+                                player.reed -= 2;
+                                player.stone -= 2;
+                                player.improvements.push(MajorImprovement::BasketmakersWorkshop);
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::BasketmakersWorkshop) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this BasketmakersWorkshop isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - BasketmakersWorkshop").to_string();
+                            }
+                        },
+                        Some(AgricolaAction::Renovation_MajorImprovement_Well) => {
+                            if player.wood >= 1 && player.stone >= 3 && self.available_improvements.contains(&MajorImprovement::Well) {
+                                player.wood -= 1;
+                                player.stone -= 3;
+                                player.improvements.push(MajorImprovement::Well);
+                                self.well_player = Some(self.current_player);
+                                self.well_food = 5;
+                                if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Well) {
+                                    self.available_improvements.remove(index);
+                                } else {
+                                    panic!("No idea why this Well isn't in the major improvement list");
+                                }
+                                action_taken = format!("Renovation and Major Improvement - Well").to_string();
+                            }
+                        },
+                        _ => panic!("No other actions available for major improvements..")
+                    }
+
+                    action_taken = format!("{:?}", agricola_action).to_string();
                 },
                 Some(AgricolaAction::Vegetable) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Vegetable).unwrap());
@@ -361,7 +888,6 @@ impl State for AgricolaState {
                     match agricola_action {
                         Some(AgricolaAction::Plow_NoSow) => {
                             player.plow();
-                            player.fields += 1;
                             action_taken = format!("Plow but No Sow").to_string();
                         }
                         Some(AgricolaAction::Sow_NoPlow) => {
@@ -370,7 +896,6 @@ impl State for AgricolaState {
                         }
                         Some(AgricolaAction::Plow_Sow) => {
                             player.plow();
-                            player.fields += 1;
                             player.sow();
                             action_taken = format!("Plow and Sow").to_string();
                         },
@@ -379,7 +904,8 @@ impl State for AgricolaState {
                 },
                 Some(AgricolaAction::FamilyGrowth_NoSpace) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::FamilyGrowth_NoSpace).unwrap());
-                    action_taken = format!("FamilyGrowth_NoSpace").to_string();
+                    player.children = 1;
+                    action_taken = format!("Family Growth with no space").to_string();
                 },
                 Some(AgricolaAction::Renovation_Fences) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Renovation_Fences).unwrap());
@@ -449,7 +975,7 @@ impl State for AgricolaState {
     fn get_result(&self, player: usize) -> f32 {
         let mut scores = Vec::new();
         for player in &self.players {
-            scores.push(player.score());
+            scores.push(player.score(false));
         }
 
         // println!("P: {} {:?} [{}]", player, scores, scores.iter().max().unwrap());
@@ -483,7 +1009,13 @@ impl AgricolaState {
             board: Board::new(),
             rounds: 1,
             total_rounds: 14,
-            actions_taken: Vec::new()
+            actions_taken: Vec::new(),
+            available_improvements: vec!(MajorImprovement::Fireplace_2, MajorImprovement::Fireplace_3, MajorImprovement::CookingHearth_4, 
+                                         MajorImprovement::CookingHearth_5, MajorImprovement::ClayOven, MajorImprovement::StoneOven, 
+                                         MajorImprovement::Joinery, MajorImprovement::Pottery, MajorImprovement::BasketmakersWorkshop, 
+                                         MajorImprovement::Well),
+            well_player: None,
+            well_food: 0
         }
     }
 
@@ -515,6 +1047,22 @@ impl AgricolaState {
 
         match self.rounds {
             4|7|9|11|13|14 => {
+                // Check Pottery, Joinery, Basketmakers Workshop
+                for ref mut player in self.players.iter_mut() {
+                    if player.improvements.contains(&MajorImprovement::Pottery) && player.clay > 0 {
+                        player.clay -= 1;
+                        player.food += 2;
+                    }
+                    if player.improvements.contains(&MajorImprovement::Joinery) && player.wood > 0 {
+                        player.wood -= 1;
+                        player.food += 2;
+                    }
+                    if player.improvements.contains(&MajorImprovement::BasketmakersWorkshop) && player.reed > 0 {
+                        player.reed -= 1;
+                        player.food += 3;
+                    }
+                }
+
                 // Field Phase
                 for ref mut player in self.players.iter_mut() {
                     for ref mut curr_tile in player.player_mat.tiles.iter_mut() {
@@ -547,17 +1095,104 @@ impl AgricolaState {
                     if player.food >= (player.total_actions * 2) + (player.children) {
                         player.food -= player.total_actions * 2 + (player.children);
                     } else {
-                        let mut food_needed = (player.total_actions * 2) + (player.children) - player.food;
+                        let mut food_needed = (player.total_actions * 2) + player.children - player.food;
                         player.food = 0;
-                        loop {
-                            if food_needed == 0 || player.grains == 0 {
-                                break;
-                            }
-                            if player.grains > 0 {
-                                player.grains -= 1;
-                                food_needed -= 1;
+
+                        // Cannot kill animals, so only leverage grain and vegetables in raw form
+                        if !(player.improvements.contains(&MajorImprovement::Fireplace_2) || 
+                             player.improvements.contains(&MajorImprovement::Fireplace_3)) {
+                            loop {
+                                if food_needed == 0 || (player.grains == 0 && player.vegetables == 0) {
+                                    break;
+                                }
+                                if player.grains > 0 {
+                                    player.grains -= 1;
+                                    food_needed -= 1;
+                                    continue;
+                                }
+                                if player.vegetables > 0 {
+                                    player.vegetables -= 1;
+                                    food_needed -= 1;
+                                }
                             }
                         }
+
+                        if food_needed > 0 && (player.improvements.contains(&MajorImprovement::Fireplace_2) || player.improvements.contains(&MajorImprovement::Fireplace_3)) {
+                            let mut best_score = player.score(false) - (food_needed * 3) as i32; // Simulate taking beggers
+                            let mut best_state = player.clone();
+                            let mut best_food_needed = food_needed;
+                            let orig_food_needed = food_needed;
+                            for a in 0..100 {
+                                let mut temp_state = player.clone();
+                                let mut food_needed = orig_food_needed;
+                                while food_needed > 0 && (temp_state.sheep > 0 || temp_state.boar > 0 || temp_state.cattle > 0 || temp_state.vegetables > 0) {
+                                    let possibles = vec!("s", "b", "c", "v", "g");
+                                    let animal = rand::thread_rng().choose(&possibles);
+                                    match animal {
+                                        Some(&"s") => { 
+                                            if temp_state.sheep == 0 { continue; }
+                                            temp_state.sheep -= 1;
+                                            if food_needed == 1 {
+                                                food_needed = 0;
+                                                temp_state.food = 1;
+                                            } else {
+                                                food_needed -= 2;
+                                            }
+
+                                        },
+                                        Some(&"b") => { 
+                                            if temp_state.boar == 0 { continue; }
+                                            temp_state.boar -= 1;
+                                            if food_needed == 1 {
+                                                food_needed = 0;
+                                                temp_state.food = 1;
+                                            } else {
+                                                food_needed -= 2;
+                                            }
+                                        },
+                                        Some(&"c") => { 
+                                            if temp_state.cattle == 0 { continue; }
+                                            temp_state.cattle -= 1;
+                                            if food_needed >= 3 {
+                                                food_needed -= 3
+                                            } else {
+                                                food_needed = 0;
+                                                temp_state.food = 3 - food_needed;
+                                            }
+                                        },
+                                        Some(&"v") => { 
+                                            if temp_state.vegetables == 0 { continue; }
+                                            temp_state.vegetables -= 1;
+                                            if food_needed == 1 {
+                                                food_needed = 0;
+                                                temp_state.food = 1;
+                                            } else {
+                                                food_needed -= 2;
+                                            }
+                                        },
+                                        Some(&"g") => { 
+                                            if temp_state.grains == 0 { continue; }
+                                            temp_state.grains -= 1;
+                                            food_needed -= 1;
+                                        },
+                                        _ => panic!("No idea what other animal/grain/vegetable can be triggered for feeding..")
+                                    }
+                                }
+
+                                if temp_state.score(false) > best_score {
+                                    // println!("Better score: {} -> {}", best_score, temp_state.score(false));
+                                    best_score = temp_state.score(false);
+                                    best_state = temp_state;
+                                    best_food_needed = food_needed;
+                                }
+                            }
+                            player.sheep = best_state.sheep;
+                            player.boar = best_state.boar;
+                            player.cattle = best_state.cattle;
+                            player.food = best_state.food;
+                            player.grains = best_state.grains;
+                           }
+
                         player.beggers += food_needed;
                     }
 
@@ -576,7 +1211,8 @@ impl AgricolaState {
                     if player.cattle >= 2 {
                         player.cattle += 1;
                     }
-                    
+
+                    player.place_animals();
                     let player_display = format!("{}", player);
                     player.actions_taken.push(format!("Breeding Phase:\n{}", player_display));
                 }
@@ -592,6 +1228,14 @@ impl AgricolaState {
         }
 
         self.rounds += 1;
+
+        if self.well_food > 0 {
+            if let Some(food_player) = self.well_player {
+                self.players[food_player].food += 1;
+                self.well_food -= 1;
+                self.players[food_player].actions_taken.push(format!("Well: +1 Food"));
+            }
+        }
     }
 
     pub fn add_action(&mut self, player: usize, action: String) {
@@ -607,12 +1251,14 @@ impl AgricolaState {
             for action in &player.actions_taken {
                 println!("{}", action);
             }
-            println!("Player {}: {}\n{}", i, player.score(), player);
+            println!("Player {}: {}\n{}", i, player.score(true), player);
         }
 
         let mut scores = Vec::new();
-        for player in &self.players {
-            scores.push(player.score());
+        for (i, player) in self.players.iter().enumerate() {
+
+            println!("-- Player {}\n{}", i, player);
+            scores.push(player.score(true));
         }
     }
 }

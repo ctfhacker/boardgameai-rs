@@ -422,7 +422,6 @@ impl PlayerMat {
         // println!("{}", self);
         Some(wood_needed)
     }
-
 }
 
 impl Display for PlayerMat {
@@ -486,14 +485,14 @@ impl Display for PlayerMat {
             for i in (row*5)..(row*5)+5 {
                 let curr_tile = &self.tiles[i];
                 match (&curr_tile.animal_type, &curr_tile.field) {
-                    (&Some(ref animal), &None) => line = format!("{} {}: {}  ", line, animal, curr_tile.animal_count),
+                    (&Some(ref animal), &None) => line = format!("{}{}: {} ", line, animal, curr_tile.animal_count),
                     (&None, &Some(ref field))  => {
                         match field.count() {
                             0 => line = format!("{}          ", line),
                             _ => line = format!("{} {}: {} ", line, field.crop(), field.count()),
                         }
                     }
-                    (&None, &None)             => line = format!("{}          ", line),
+                    (&None, &None)             => line = format!("{} ----     ", line),
                     _ => panic!("Tile has multiple types!")
                 };
                 match curr_tile.east_fence {

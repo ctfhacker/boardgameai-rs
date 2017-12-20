@@ -13,6 +13,7 @@ use std::ops::Deref;
 use std::fs::File;
 use std::io::Read;
 use rand::Rng;
+use std::time::{Duration, Instant};
 
 fn random() -> usize {
     let mut urandom = File::open("/dev/urandom").ok().unwrap();
@@ -155,28 +156,22 @@ fn main() {
     println!("{}", state.board);
 
     while state.clone().get_actions().len() > 0 {
+        let now = Instant::now();
         let mut best_action;
+        let mut iterations = 0;
         if state.current_player == 0 {
-            // First player is "better" with more iterations
-            best_action = UCT(arena, state.clone(), 1000);
+            // First player is "dumb" with less iterations
+            iterations = 5001;
+            best_action = UCT(arena, state.clone(), iterations);
         } else {
-            // "dumb" players
-            best_action = UCT(arena, state.clone(), 1000);
+            // "smart" players
+            iterations = 5002;
+            best_action = UCT(arena, state.clone(), iterations);
         }
 
-        println!("Best action {:?}", AgricolaAction::from_u32(best_action));
+        println!("[{:?}] Best action [{}] {:?}", now.elapsed().as_secs(), iterations, AgricolaAction::from_u32(best_action));
         state.do_action(best_action);
     }
 
-    loop {
-        let actions = state.get_actions();
-        if (actions.len() == 0) {
-            break;
-        }
-
-        state.do_action(actions[0]);
-        println!("{:?}", actions);
-    }
-    // println!("{:?}", state);
     state.print_ending();
 }
