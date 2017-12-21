@@ -15,3 +15,7 @@ This implementation revolves around only one action being passed back to the UCF
 * If MajorImprovement is taken for Cooking Hearth, and there is an option for paying via clay or exchanging a fireplace, there is a 50% chance of exchanging vs paying for the improvement outright.
 * Baking Bread will cook all available grain if possible
 * Pottery/Joinery/Basketmaker's Workshop will always be used if possible during harvest
+
+### TODO
+
+Currently the AI sees the entire board from the beginning. Need to add the ability to simulate all random actions per round.
