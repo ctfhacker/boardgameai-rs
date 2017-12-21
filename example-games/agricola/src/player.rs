@@ -33,7 +33,8 @@ pub struct Player {
 
 impl Player {
     pub fn new(food: usize) -> Player {
-        Player {
+        
+        let mut new_player = Player {
             food: food,
             fields: 0,
             grains: 0,
@@ -57,7 +58,10 @@ impl Player {
             stables: 0,
             pet: None,
             improvements: Vec::new()
-        }
+        };
+        let new_player_display = format!("{}", new_player);
+        new_player.actions_taken.push(format!("Round: 0 [2/2] Init\n{}", new_player_display));
+        new_player
     }
 
     pub fn score(&self, verbose: bool) -> i32 {
@@ -404,49 +408,63 @@ impl Player {
     }
 
     pub fn make_pastures(&mut self) -> usize {
-        let mut curr_pasture = HashSet::new();
         let mut fences_built = 0;
 
-        {
-            let empty_spaces: Vec<&FarmTile> = self.player_mat.tiles.iter()
-                                                                    .filter(|&t| t.can_be_fenced())
-                                                                    .collect(); 
-                
+        for i in 0..20 {
+            let mut curr_pasture = HashSet::new();
 
-            if let Some(temp_space) = ::rand::thread_rng().choose(&empty_spaces) {
-                let mut curr_space = *temp_space;
-                curr_pasture.insert(curr_space.index);
-                loop {
-                    if ::rand::random::<usize>() % 100 < 50 {
-                        break;
-                    }
+            {
+                let empty_spaces: Vec<&FarmTile> = self.player_mat.tiles.iter()
+                                                                        .filter(|&t| t.can_be_fenced())
+                                                                        .collect(); 
                     
-                    let surrounding_tiles: Vec<&usize> = curr_space.surrounding_tiles.iter()
-                                                                                    .filter(|&t| self.player_mat.tiles[*t].can_be_fenced())
-                                                                                    .collect();
 
-                    if let Some(surrounding_tile) = ::rand::thread_rng().choose(&surrounding_tiles) {
-                        curr_space = &self.player_mat.tiles[**surrounding_tile];
-                        curr_pasture.insert(**surrounding_tile);
-                    } else {
-                        break;
+                if let Some(temp_space) = ::rand::thread_rng().choose(&empty_spaces) {
+                    let mut curr_space = *temp_space;
+                    curr_pasture.insert(curr_space.index);
+                    loop {
+                        if ::rand::random::<usize>() % 100 < 20 {
+                            break;
+                        }
+                        
+                        let surrounding_tiles: Vec<&usize> = curr_space.surrounding_tiles.iter()
+                                                                                        .filter(|&t| self.player_mat.tiles[*t].can_be_fenced())
+                                                                                        .collect();
+
+                        if let Some(surrounding_tile) = ::rand::thread_rng().choose(&surrounding_tiles) {
+                            curr_space = &self.player_mat.tiles[**surrounding_tile];
+                            curr_pasture.insert(**surrounding_tile);
+                        } else {
+                            break;
+                        }
                     }
+                } else {
+                    // println!("[Make Pastures] No more empty spaces.. cannot make pasture");
                 }
-            } else {
-                // println!("[Make Pastures] No more empty spaces.. cannot make pasture");
+            }
+
+            // println!("Fences: {} Wood: {}", self.fences, self.wood);
+            // println!("Max fences: min({}, {})", 15-self.fences, self.wood);
+            let max_fences = std::cmp::min(15-self.fences, self.wood);
+
+            if curr_pasture.len() > 0 {
+                if let Some(wood_used) = self.player_mat.make_pasture(curr_pasture.clone().into_iter().collect(), max_fences) {
+                    // if wood_used+self.fences > 15 {
+                        // println!("Max fences: min({}, {})", 15-self.fences, self.wood);
+                        // println!("Wood used: {}", wood_used);
+                    // }
+
+                    let stables = curr_pasture.iter().filter(|&&t| self.player_mat.tiles[t].stable == true).collect::<Vec<&usize>>().len();
+                    self.wood -= wood_used;
+                    self.fences += wood_used;
+                    self.pastures.push(
+                        Pasture::new(curr_pasture.into_iter().collect(), stables)
+                    );
+                    fences_built += wood_used;
+                }
             }
         }
 
-        if curr_pasture.len() > 0 {
-            if let Some(wood_used) = self.player_mat.make_pasture(curr_pasture.clone().into_iter().collect(), self.wood) {
-                let stables = curr_pasture.iter().filter(|&&t| self.player_mat.tiles[t].stable == true).collect::<Vec<&usize>>().len();
-                self.wood -= wood_used;
-                self.pastures.push(
-                    Pasture::new(curr_pasture.into_iter().collect(), stables)
-                );
-                fences_built += wood_used;
-            }
-        }
         fences_built
     }
 
