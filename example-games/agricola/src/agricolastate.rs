@@ -160,6 +160,7 @@ impl State for AgricolaState {
             panic!("Oh noes.. attempting to play a piece with no actions. :(");
         }
         // println!("[R:{} P:{}] Action: {} {:?}", self.rounds, self.current_player, action, AgricolaAction::from_u32(action));
+        let self_clone = self.clone();
         let player_index = self.current_player;
         let num_players = self.players.len();
         let mut action_taken = String::from("");
@@ -293,6 +294,7 @@ impl State for AgricolaState {
                     player.food += curr_tile.items;
                     action_taken = format!("Starting Player and Food +{}", curr_tile.items).to_string();
                     self.starting_player_token = Some(self.current_player);
+                    curr_tile.items = 0;
                 },
                 Some(AgricolaAction::Plow) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Plow).unwrap());
@@ -340,6 +342,8 @@ impl State for AgricolaState {
                 Some(AgricolaAction::MajorImprovement_Pottery) |
                 Some(AgricolaAction::MajorImprovement_Joinery) |
                 Some(AgricolaAction::MajorImprovement_BasketmakersWorkshop) => {
+                    // println!("{}", self_clone);
+                    // println!("{:?}", agricola_action);
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::MajorImprovement).unwrap());
 
                     match agricola_action {
@@ -349,10 +353,17 @@ impl State for AgricolaState {
                                 player.improvements.push(MajorImprovement::Fireplace_2);
                                 if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
                                     self.available_improvements.remove(index);
+                                    action_taken = format!("Major Improvement +Fireplace (2)").to_string();
                                 } else {
-                                    panic!("No idea why this Fireplace_2 isn't in the major improvement list");
+                                    // panic!("No idea why this Fireplace_2 isn't in the major improvement list");
+                                    action_taken = format!("Tried to buy Fireplace (2), but it wasn't available").to_string();
                                 }
-                                action_taken = format!("Major Improvement +Fireplace (2)").to_string();
+                            }
+
+                            if player.clay < 2 {
+                                action_taken = format!("Tried to buy Fireplace (2), but not enough clay").to_string();
+                            } else {
+                                action_taken = format!("Tried to buy Fireplace (2), but it wasn't available..").to_string();
                             }
                         },
                         Some(AgricolaAction::MajorImprovement_Fireplace_3) => {
@@ -361,10 +372,17 @@ impl State for AgricolaState {
                                 player.improvements.push(MajorImprovement::Fireplace_3);
                                 if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
                                     self.available_improvements.remove(index);
+                                    action_taken = format!("Major Improvement +Fireplace (3)").to_string();
                                 } else {
-                                    panic!("No idea why this Fireplace_3 isn't in the major improvement list");
+                                    action_taken = format!("Tried to buy Fireplace (3), but it wasn't available").to_string();
                                 }
                                 action_taken = format!("Major Improvement +Fireplace (3)").to_string();
+                            }
+
+                            if player.clay < 3 {
+                                action_taken = format!("Tried to buy Fireplace (3), but not enough clay").to_string();
+                            } else {
+                                action_taken = format!("Tried to buy Fireplace (3), but it wasn't available..").to_string();
                             }
                         },
                         Some(AgricolaAction::MajorImprovement_CookingHearth_4) => {
@@ -391,10 +409,10 @@ impl State for AgricolaState {
                                     if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
                                         self.available_improvements.remove(index);
                                         player.clay -= 4; 
+                                        action_taken = format!("Major Improvement +Cooking Hearth (4) (Pay)").to_string();
                                     } else {
-                                        // Cooking Hearth 4 is already taken
+                                        action_taken = format!("Tried to buy Cooking Hearth (4), but it wasn't available").to_string();
                                     }
-                                    action_taken = format!("Major Improvement +Cooking Hearth (4) (Pay)").to_string();
                                 },
                                 Some("exchange") => {
                                     if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
@@ -404,7 +422,7 @@ impl State for AgricolaState {
                                             player.improvements.remove(fireplace_index);
                                             player.improvements.push(MajorImprovement::CookingHearth_4);
                                         } else {
-                                            // Cooking Hearth 4 is already taken
+                                            action_taken = format!("Tried to exchange for Cooking Hearth (4), but it wasn't available").to_string();
                                         }
                                     } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
                                         if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_4) {
@@ -412,11 +430,11 @@ impl State for AgricolaState {
                                             self.available_improvements.push(MajorImprovement::Fireplace_2);
                                             player.improvements.remove(fireplace_index);
                                             player.improvements.push(MajorImprovement::CookingHearth_4);
+                                            action_taken = format!("Exchange Fireplace (2) -> Cooking Hearth (4)").to_string();
                                         } else {
-                                            // Cooking Hearth 4 is already taken
+                                            action_taken = format!("Tried to exchange for Cooking Hearth (4), but it wasn't available").to_string();
                                         }
                                     }
-                                    action_taken = format!("Major Improvement +Cooking Hearth (4) (Exchange)").to_string();
                                 },
                                 _ => {} // Cannot pay or exchange for Cooking Hearth 4
                             }
@@ -445,10 +463,11 @@ impl State for AgricolaState {
                                     if let Some(index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
                                         player.clay -= 5; 
                                         self.available_improvements.remove(index);
+                                        action_taken = format!("Major Improvement +Cooking Hearth (5) (Pay)").to_string();
                                     } else {
                                         // Cooking Hearth 5 is already taken
+                                        action_taken = format!("Tried to buy Cooking Hearth (5), but it wasn't available").to_string();
                                     }
-                                    action_taken = format!("Major Improvement +Cooking Hearth (5) (Pay)").to_string();
                                 },
                                 Some("exchange") => {
                                     if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_3) {
@@ -457,8 +476,10 @@ impl State for AgricolaState {
                                             self.available_improvements.push(MajorImprovement::Fireplace_3);
                                             player.improvements.remove(fireplace_index);
                                             player.improvements.push(MajorImprovement::CookingHearth_5);
+                                            action_taken = format!("Major Improvement Fireplace (3) -> Cooking Hearth (5)").to_string();
                                         } else {
                                             // Cooking Hearth 5 is already taken
+                                            action_taken = format!("Tried to buy Cooking Hearth (5), but it wasn't available").to_string();
                                         }
                                     } else if let Some(fireplace_index) = player.improvements.iter().position(|x| *x == MajorImprovement::Fireplace_2) {
                                         if let Some(cookinghearth_index) = self.available_improvements.iter().position(|x| *x == MajorImprovement::CookingHearth_5) {
@@ -466,11 +487,12 @@ impl State for AgricolaState {
                                             self.available_improvements.push(MajorImprovement::Fireplace_2);
                                             player.improvements.remove(fireplace_index);
                                             player.improvements.push(MajorImprovement::CookingHearth_5);
+                                            action_taken = format!("Major Improvement Fireplace (2) -> Cooking Hearth (5)").to_string();
                                         } else {
                                             // Cooking Hearth 5 is already taken
+                                            action_taken = format!("Tried to buy Cooking Hearth (5), but it wasn't available").to_string();
                                         }
                                     }
-                                    action_taken = format!("Major Improvement +Cooking Hearth (5) (Exchange)").to_string();
                                 },
                                 _ => {} // Cannot pay or exchange for Cooking Hearth 5
                             }
@@ -482,12 +504,21 @@ impl State for AgricolaState {
                                     player.clay -= 3;
                                     player.stone -= 1;
                                     player.improvements.push(MajorImprovement::ClayOven);
-                                    player.bake_bread();
+                                    let food = player.bake_bread();
+                                    action_taken = format!("Major Improvement - Clay Oven (BakeBread +{})", food).to_string();
                                 } else {
                                     // Clay Oven taken
                                     // panic!("No idea why this ClayOven isn't in the major improvement list");
+                                    action_taken = format!("Tried to buy Clay Oven, but it wasn't available").to_string();
                                 }
-                                action_taken = format!("Major Improvement - Clay Oven").to_string();
+                            }
+
+                            if player.clay < 3 {
+                                action_taken = format!("Tried to buy Clay Oven, but not enough clay").to_string();
+                            } else if player.stone < 1 {
+                                action_taken = format!("Tried to buy Clay Oven, but not enough stone").to_string();
+                            } else {
+                                action_taken = format!("Tried to buy Clay Oven, but it wasn't available..").to_string();
                             }
                         },
                         Some(AgricolaAction::MajorImprovement_StoneOven) => {
@@ -497,12 +528,19 @@ impl State for AgricolaState {
                                     player.clay -= 1;
                                     player.stone -= 3;
                                     player.improvements.push(MajorImprovement::StoneOven);
-                                    player.bake_bread();
+                                    let food = player.bake_bread();
+                                    action_taken = format!("Major Improvement - Stone Oven (BakeBread +{})", food).to_string();
                                 } else {
                                     // Stone Oven taken
-                                    // panic!("No idea why this StoneOven isn't in the major improvement list");
+                                    action_taken = format!("Tried to buy Stone Oven, but it wasn't available").to_string();
                                 }
-                                action_taken = format!("Major Improvement - Stone Oven").to_string();
+                            }
+                            if player.clay == 0 {
+                                action_taken = format!("Tried to buy Stone Oven, but not enough clay").to_string();
+                            } else if player.stone < 3 {
+                                action_taken = format!("Tried to buy Stone Oven, but not enough stone").to_string();
+                            } else {
+                                action_taken = format!("Tried to buy Stone Oven, but it wasn't available..").to_string();
                             }
                         },
                         Some(AgricolaAction::MajorImprovement_Pottery) => {
@@ -567,7 +605,7 @@ impl State for AgricolaState {
                 Some(AgricolaAction::Fences) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Fences).unwrap());
                     let fences_built = player.make_pastures();
-                    player.fences += fences_built;
+                    // player.fences += fences_built;
                     action_taken = format!("Fences +{}", fences_built).to_string();
                 },
                 Some(AgricolaAction::FamilyGrowth) => {
@@ -860,6 +898,7 @@ impl State for AgricolaState {
                         panic!("Player {} is bad.. Boar is already taken", player_index);
                     }
                     player.boar += curr_tile.items;
+                    player.place_animals();
                     action_taken = format!("Boar +{}", curr_tile.items).to_string();
                     curr_tile.items = 0;
                 },
@@ -869,6 +908,7 @@ impl State for AgricolaState {
                         panic!("Player {} is bad.. Cattle is already taken", player_index);
                     }
                     player.cattle += curr_tile.items;
+                    player.place_animals();
                     action_taken = format!("Cattle +{}", curr_tile.items).to_string();
                     curr_tile.items = 0;
                 },
@@ -913,7 +953,6 @@ impl State for AgricolaState {
                                                            .filter(|t| t.house.is_some())
                                                            .count();
 
-
                     match player.house_type {
                         HouseType::Wood => {
                             if player.clay >= num_rooms && player.reed >= 1 {
@@ -933,7 +972,6 @@ impl State for AgricolaState {
                     }
 
                     let fences_built = player.make_pastures();
-                    player.fences += fences_built;
                     action_taken = format!("Renovation and Fences +{}", fences_built).to_string();
                 },
                 _ => {
@@ -978,7 +1016,6 @@ impl State for AgricolaState {
             scores.push(player.score(false));
         }
 
-        // println!("P: {} {:?} [{}]", player, scores, scores.iter().max().unwrap());
         if scores[player] == *scores.iter().max().unwrap() {
             return 1.0
         } else {
@@ -992,12 +1029,12 @@ impl AgricolaState {
     pub fn new(num_players: usize) -> AgricolaState {
         let mut players = Vec::new();
 
-        /// Player one gets 1 food while others get 2
+        /// Player one gets 2 food while others get 3
         for i in 0..num_players {
             if i == 0 {
-                players.push(Player::new(1));
-            } else {
                 players.push(Player::new(2));
+            } else {
+                players.push(Player::new(3));
             }
         }
 
@@ -1022,11 +1059,6 @@ impl AgricolaState {
     pub fn end_round(&mut self) {
         // println!("Ending round");
         
-        // Reset actions for all players
-        for mut player in self.players.iter_mut() {
-            player.actions = player.total_actions;
-            // println!("After reset: {}", player);
-        }
 
         // Set next player
         match self.starting_player_token {
@@ -1083,7 +1115,9 @@ impl AgricolaState {
                             }
                         };
                         if empty {
-                            curr_tile.field = None;
+                            if let Some(ref mut field) = curr_tile.field {
+                                field.crop = None
+                            }
                         }
                     }
                     let player_display = format!("{}", player);
@@ -1227,6 +1261,11 @@ impl AgricolaState {
             }
         }
 
+        // Reset actions for all players
+        for mut player in self.players.iter_mut() {
+            player.actions = player.total_actions;
+        }
+
         self.rounds += 1;
 
         if self.well_food > 0 {
@@ -1267,7 +1306,8 @@ impl Display for AgricolaState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Player Just Played: {}\n", self.player_just_moved + 1);
         for (i, player) in self.players.iter().enumerate() {
-            write!(f, "P: {} {}\n", i+1, player);
+            let num_actions_taken = player.actions_taken.len();
+            write!(f, "P: {} {}\n", i+1, player.actions_taken.iter().nth(num_actions_taken-1).unwrap());
         }
         write!(f, "{}", self.board);
         write!(f, "Next Player: {}\n", self.current_player + 1)
