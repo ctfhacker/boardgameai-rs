@@ -2,6 +2,7 @@ use super::*;
 use std::fmt;
 use std::fmt::Display;
 use std::collections::{HashSet, HashMap};
+use rand::Rng;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BoardTile {
@@ -13,6 +14,7 @@ pub struct BoardTile {
 #[derive(Debug, Clone)]
 pub struct Board {
     pub tiles: HashMap<AgricolaTile, Box<BoardTile>>,
+    // pub future_tiles: Vec<Vec<(AgricolaTile, Box<BoardTile>)>>,
     pub future_tiles: Vec<(AgricolaTile, Box<BoardTile>)>,
 }
 
@@ -59,6 +61,15 @@ impl Board {
         future_tiles.extend(round_2_tiles);
         future_tiles.extend(round_1_tiles);
 
+        /*
+        future_tiles.push(round_6_tiles);
+        future_tiles.push(round_5_tiles);
+        future_tiles.push(round_4_tiles);
+        future_tiles.push(round_3_tiles);
+        future_tiles.push(round_2_tiles);
+        future_tiles.push(round_1_tiles);
+        */
+
         let mut board = HashMap::new();
         board.insert(AgricolaTile::BuildRoom_BuildStables, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::StartingPlayer_Food, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
@@ -76,6 +87,21 @@ impl Board {
             // println!("Next action: {:?} {:?}", next_card, next_tile);
             board.insert(next_card, next_tile);
         }
+
+        /*
+        // Insert first action
+        if let Some(mut tile_set) = future_tiles.pop() {
+            rand::thread_rng().shuffle(&mut tile_set);
+            if let Some((next_card, next_tile)) = tile_set.pop() {
+                board.insert(next_card, next_tile);
+            }
+
+            if tile_set.len() > 0 {
+                future_tiles.push(tile_set);
+            }
+            // println!("Next action: {:?} {:?}", next_card, next_tile);
+        }
+        */
 
         Board {
             tiles: board,
@@ -95,6 +121,20 @@ impl Board {
             // println!("Next action: {:?} {:?}", next_card, next_tile);
             self.tiles.insert(next_card, next_tile);
         }
+
+        /*
+        if let Some(mut tile_set) = self.future_tiles.pop() {
+            rand::thread_rng().shuffle(&mut tile_set);
+            if let Some((next_card, next_tile)) = tile_set.pop() {
+                self.tiles.insert(next_card, next_tile);
+            }
+
+            if tile_set.len() > 0 {
+                self.future_tiles.push(tile_set);
+            }
+            // println!("Next action: {:?} {:?}", next_card, next_tile);
+        }
+        */
     }
 }
 
@@ -105,7 +145,7 @@ impl Display for Board {
                 Some(x) => format!("{}", x),
                 None => String::from("NA")
             };
-            write!(f, "{:?} -- Player: {:?} Items: {:?}\n", tile, player, data.items);
+            write!(f, "{:<width$} -- Player: {:?} Items: {:?}\n", tile.to_string(), player, data.items, width=30);
         }
         Ok(())
     }
