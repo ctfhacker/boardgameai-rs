@@ -8,29 +8,25 @@ use boardgameai_rs::node::{NodeArena, NodeId};
 use nim::NimState;
 use agricola::AgricolaState;
 use agricola::AgricolaAction;
-use std::fmt::Debug;
-use std::ops::Deref;
+use std::fmt::{Debug, Display};
 use std::fs::File;
 use std::io::Read;
-use rand::Rng;
 use std::time::{Duration, Instant};
+use std::io::{self, BufRead};
 
-fn random() -> usize {
-    let mut urandom = File::open("/dev/urandom").ok().unwrap();
-    let mut buf = [0, 1];
-    urandom.read_exact(&mut buf);
-    buf[0] as usize
-}
+fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, rootstate: S, seconds: u64) -> u32 {
+    let rootnode = arena.new_node(rootstate.clone());
 
-fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations: u32) -> u32 {
-    let mut rootnode = arena.new_node(rootstate.clone());
+    let begin_time = Instant::now();
+    let time_to_think = Duration::from_secs(seconds);
 
-    for i in 1..iterations {
+    // for i in 1..iterations {
+    while begin_time.elapsed() < time_to_think {
         // println!("i: {}", i);
         let mut curr_node = rootnode;
 
         //let mut node = &arena[rootnode].clone();
-        let mut node: NodeId;
+        let node: NodeId;
         let mut state = rootstate.clone();
 
         // println!("Before select: {:?}", curr_node);
@@ -48,15 +44,6 @@ fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations
             for child in &arena[curr_node].children {
                 let curr_child = &arena[*child];
                 let curr_value = (curr_child.wins as f64)/(curr_child.visits as f64) + UCTK * ((((arena[curr_node].visits as f64).ln() * 2.0) / (curr_child.visits as f64)).sqrt());
-                /*
-                println!("{}/{} + 1.4 * sqrt(2*log({})/{})", (curr_child.wins as f64), (curr_child.visits as f64), (arena[curr_node].visits as f64), curr_child.visits as f64);
-                println!("{}/{} + 1.4 * sqrt({}/{})", 
-                    (curr_child.wins as f64), 
-                    (curr_child.visits as f64), 
-                    (arena[curr_node].visits as f64).ln() * 2.0, 
-                    curr_child.visits as f64);
-                */
-                // println!("V: {:?} {}", curr_value, curr_child);
 
                 if curr_value > best_value {
                     best_value = curr_value;
@@ -75,7 +62,7 @@ fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations
         // Expand
         if arena[curr_node].untried_actions.len() > 0 {
             let num_actions = arena[curr_node].untried_actions.len();
-            let action = arena[curr_node].untried_actions[random() % num_actions]; 
+            let action = arena[curr_node].untried_actions[rand::random::<usize>() % num_actions]; 
             state.do_action(action);
 
             // let new_nodeid = node.add_child(arena, Some(action), state.clone());
@@ -113,7 +100,7 @@ fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations
                 break;
             }
             let num_actions = state.get_actions().len();
-            let curr_move = state.get_actions()[random() % num_actions];
+            let curr_move = state.get_actions()[rand::random::<usize>() % num_actions];
             state.do_action(curr_move); 
             // println!("Move: {:?} State: {:?}", curr_move, state);
         }
@@ -148,25 +135,49 @@ fn UCT<S: State+Clone+Debug>(arena: &mut NodeArena, mut rootstate: S, iterations
     }
 }
 
+fn human_action<S: State+Clone+Display>(state: S) -> u32 {
+
+    println!("Current State: {}", state);
+    let possible_actions = state.get_actions();
+    for (i, action) in possible_actions.iter().enumerate() {
+        println!("[{}] {:?}", i, AgricolaAction::from_u32(*action).unwrap());
+    }
+    println!("Enter your action: ");
+
+    let mut choice = String::new();
+    let stdin = io::stdin();
+    stdin.lock().read_line(&mut choice).expect("Failed to read stdin choice..");
+    let choice = choice.trim().parse::<usize>().unwrap();
+
+    let their_choice = possible_actions.iter().nth(choice).unwrap();
+    println!("Your choice: {:?} -> {:?}", their_choice, AgricolaAction::from_u32(*their_choice));
+    *their_choice
+}
+
+
 fn main() {
     let arena = &mut NodeArena::new();
     // let mut state = NimState::new(10);
     //
     let mut state = AgricolaState::new(2);
-    println!("{}", state.board);
 
     while state.clone().get_actions().len() > 0 {
         let now = Instant::now();
-        let mut best_action;
-        let mut iterations = 0;
+        let best_action;
+        let iterations = 0;
         if state.current_player == 0 {
             // First player is "dumb" with less iterations
-            iterations = 10001;
-            best_action = UCT(arena, state.clone(), iterations);
+            let seconds = 10;
+            best_action = UCT(arena, state.clone(), seconds);
         } else {
             // "smart" players
-            iterations = 1002;
-            best_action = UCT(arena, state.clone(), iterations);
+            let seconds = 10;
+            best_action = UCT(arena, state.clone(), seconds);
+
+            /*
+            let num_actions_taken = state.players[0].actions_taken.len();
+            best_action = human_action(state.clone());
+            */
         }
 
         println!("[{:?}] Best action [{}] {:?}", now.elapsed().as_secs(), iterations, AgricolaAction::from_u32(best_action));
