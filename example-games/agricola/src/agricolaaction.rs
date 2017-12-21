@@ -1,4 +1,6 @@
 use super::*;
+use std::fmt;
+use std::string::ToString;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub enum AgricolaTile {
@@ -26,6 +28,37 @@ pub enum AgricolaTile {
     Plow_Sow = 22,
     FamilyGrowth_NoSpace = 23,
     Renovation_Fences = 24
+}
+
+impl ToString for AgricolaTile {
+    fn to_string(&self) -> String {
+        match self {
+            &AgricolaTile::BuildRoom_BuildStables => String::from("BuildRoom_BuildStables"),
+            &AgricolaTile::StartingPlayer_Food => String::from("StartingPlayer_Food"),
+            &AgricolaTile::Grain => String::from("Grain"),
+            &AgricolaTile::Plow => String::from("Plow"),
+            &AgricolaTile::BuildStable_BakeBread => String::from("BuildStable_BakeBread"),
+            &AgricolaTile::DayLaborer => String::from("DayLaborer"),
+            &AgricolaTile::Sow_BakeBread => String::from("Sow_BakeBread"),
+            &AgricolaTile::Wood => String::from("Wood"),
+            &AgricolaTile::Clay => String::from("Clay"),
+            &AgricolaTile::Reed => String::from("Reed"),
+            &AgricolaTile::Fishing => String::from("Fishing"),
+            &AgricolaTile::Fences => String::from("Fences"),
+            &AgricolaTile::MajorImprovement => String::from("MajorImprovement"),
+            &AgricolaTile::Sheep => String::from("Sheep"),
+            &AgricolaTile::FamilyGrowth => String::from("FamilyGrowth"),
+            &AgricolaTile::Stone_1 => String::from("Stone_1"),
+            &AgricolaTile::Renovation_MajorImprovement => String::from("Renovation_MajorImprovement"),
+            &AgricolaTile::Vegetable => String::from("Vegetable"),
+            &AgricolaTile::Boar => String::from("Boar"),
+            &AgricolaTile::Cattle => String::from("Cattle"),
+            &AgricolaTile::Stone_2 => String::from("Stone_2"),
+            &AgricolaTile::Plow_Sow => String::from("Plow_Sow"),
+            &AgricolaTile::FamilyGrowth_NoSpace => String::from("FamilyGrowth_NoSpace"),
+            &AgricolaTile::Renovation_Fences => String::from("Renovation_Fences"),
+        }
+    }
 }
 
 #[derive(Debug)]
