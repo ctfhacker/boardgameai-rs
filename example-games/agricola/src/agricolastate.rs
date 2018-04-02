@@ -159,6 +159,7 @@ impl State for AgricolaState {
         if self.players[self.current_player].actions == 0 {
             panic!("Oh noes.. attempting to play a piece with no actions. :(");
         }
+
         // println!("[R:{} P:{}] Action: {} {:?}", self.rounds, self.current_player, action, AgricolaAction::from_u32(action));
         let self_clone = self.clone();
         let player_index = self.current_player;
@@ -221,7 +222,8 @@ impl State for AgricolaState {
                     if !curr_tile.occupied.is_none() {
                         panic!("Player {} is bad.. day_laborer is already taken", player_index);
                     }
-                    player.food += 1;
+                    player.food += 2;
+                    /*
                     match agricola_action {
                         Some(AgricolaAction::DayLaborer_Food_Wood) => {
                             action_taken = format!("Day Laborer Food +1 Wood +1").to_string();
@@ -241,6 +243,8 @@ impl State for AgricolaState {
                         },
                         _ => panic!("Should never get here.. Day Laborer only has 4 choices..")
                     }
+                    */
+                    action_taken = format!("Day Laborer Food +2").to_string();
                 },
                 Some(AgricolaAction::Sow) |
                 Some(AgricolaAction::BakeBread_NotSow) |
@@ -305,7 +309,8 @@ impl State for AgricolaState {
                 Some(AgricolaAction::BakeBread_NoStable) |
                 Some(AgricolaAction::BuildStable_BakeBread) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::BuildStable_BakeBread).unwrap());
-                    // TODO Bake Bread
+                    action_taken = format!("Ignored!");
+                    /*
                     match agricola_action {
                         Some(AgricolaAction::BuildStable) => {
                             player.build_stable();
@@ -322,6 +327,7 @@ impl State for AgricolaState {
                         },
                         _ => panic!("[BuildStable_BakeBread] Can never reach here..")
                     }
+                    */
                 },
                 Some(AgricolaAction::Sheep) => {
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::Sheep).unwrap());
@@ -344,6 +350,7 @@ impl State for AgricolaState {
                 Some(AgricolaAction::MajorImprovement_BasketmakersWorkshop) => {
                     // println!("{}", self_clone);
                     // println!("{:?}", agricola_action);
+                    //
                     curr_tile = &mut *(self.board.tiles.get_mut(&AgricolaTile::MajorImprovement).unwrap());
 
                     match agricola_action {
@@ -1058,7 +1065,6 @@ impl AgricolaState {
 
     pub fn end_round(&mut self) {
         // println!("Ending round");
-        
 
         // Set next player
         match self.starting_player_token {

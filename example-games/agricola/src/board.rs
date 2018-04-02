@@ -4,7 +4,7 @@ use std::fmt::Display;
 use std::collections::{HashSet, HashMap};
 use rand::Rng;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct BoardTile {
     pub occupied: Option<usize>,
     pub items: usize,
@@ -14,8 +14,8 @@ pub struct BoardTile {
 #[derive(Debug, Clone)]
 pub struct Board {
     pub tiles: HashMap<AgricolaTile, Box<BoardTile>>,
-    // pub future_tiles: Vec<Vec<(AgricolaTile, Box<BoardTile>)>>,
-    pub future_tiles: Vec<(AgricolaTile, Box<BoardTile>)>,
+    pub future_tiles: Vec<Vec<(AgricolaTile, Box<BoardTile>)>>,
+    // pub future_tiles: Vec<(AgricolaTile, Box<BoardTile>)>, // Non random action draw
 }
 
 impl Board {
@@ -54,21 +54,23 @@ impl Board {
             (AgricolaTile::Renovation_Fences, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0})),
         );
 
+        /*
+        // Non random action draw
         future_tiles.extend(round_6_tiles);
         future_tiles.extend(round_5_tiles);
         future_tiles.extend(round_4_tiles);
         future_tiles.extend(round_3_tiles);
         future_tiles.extend(round_2_tiles);
         future_tiles.extend(round_1_tiles);
+        */
 
-        /*
+        // Rando action draw
         future_tiles.push(round_6_tiles);
         future_tiles.push(round_5_tiles);
         future_tiles.push(round_4_tiles);
         future_tiles.push(round_3_tiles);
         future_tiles.push(round_2_tiles);
         future_tiles.push(round_1_tiles);
-        */
 
         let mut board = HashMap::new();
         board.insert(AgricolaTile::BuildRoom_BuildStables, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
@@ -79,29 +81,29 @@ impl Board {
         board.insert(AgricolaTile::DayLaborer, Box::new(BoardTile { occupied: None, items: 0, reset_amount: 0}));
         board.insert(AgricolaTile::Wood, Box::new(BoardTile { occupied: None, items: 3, reset_amount: 3}));
         board.insert(AgricolaTile::Clay, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
-        board.insert(AgricolaTile::Reed, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
         board.insert(AgricolaTile::Fishing, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
+        board.insert(AgricolaTile::Reed, Box::new(BoardTile { occupied: None, items: 1, reset_amount: 1}));
 
         // Insert first action
+        /*
         if let Some((next_card, next_tile)) = future_tiles.pop() {
             // println!("Next action: {:?} {:?}", next_card, next_tile);
             board.insert(next_card, next_tile);
         }
+        */
 
-        /*
         // Insert first action
         if let Some(mut tile_set) = future_tiles.pop() {
             rand::thread_rng().shuffle(&mut tile_set);
             if let Some((next_card, next_tile)) = tile_set.pop() {
+                println!("[Board init] Next action: {:?} {:?}", next_card, next_tile);
                 board.insert(next_card, next_tile);
             }
 
             if tile_set.len() > 0 {
                 future_tiles.push(tile_set);
             }
-            // println!("Next action: {:?} {:?}", next_card, next_tile);
         }
-        */
 
         Board {
             tiles: board,
@@ -117,24 +119,26 @@ impl Board {
             tile.occupied = None;
         }
 
+        /*
+        // Non random action draw
         if let Some((next_card, next_tile)) = self.future_tiles.pop() {
             // println!("Next action: {:?} {:?}", next_card, next_tile);
             self.tiles.insert(next_card, next_tile);
         }
+        */
 
-        /*
+        // Random action draw
         if let Some(mut tile_set) = self.future_tiles.pop() {
             rand::thread_rng().shuffle(&mut tile_set);
             if let Some((next_card, next_tile)) = tile_set.pop() {
+                // println!("[Board reset] Next action: {:?} {:?}", next_card, next_tile);
                 self.tiles.insert(next_card, next_tile);
             }
 
             if tile_set.len() > 0 {
                 self.future_tiles.push(tile_set);
             }
-            // println!("Next action: {:?} {:?}", next_card, next_tile);
         }
-        */
     }
 }
 
